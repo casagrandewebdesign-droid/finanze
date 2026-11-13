@@ -96,6 +96,18 @@ nav button.on{color:var(--brand)}
 .inv .it .a{text-align:right}
 .inv .it .a small{display:block;font-size:12px;font-weight:500}
 .sync{font-size:12px;color:var(--muted);text-align:center;margin-top:14px}
+.chart{position:relative;margin-top:6px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .tip{position:absolute;top:0;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;padding:4px 8px;border-radius:8px;white-space:nowrap;pointer-events:none;display:none}
+.periods{display:flex;gap:6px;margin:4px 0 10px}
+.periods button{flex:1;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:7px;font-weight:600;font-size:14px}
+.periods button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.comp{display:flex;height:12px;border-radius:8px;overflow:hidden;margin:8px 0 6px}
+.comp i{display:block;height:100%}
+.legend{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.legend b{color:var(--ink)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
+nav button{padding:4px 4px}
 </style>
 </head>
 <body>
@@ -139,6 +151,35 @@ nav button.on{color:var(--brand)}
   <div class="card list" id="movList"></div>
 </section>
 
+<!-- PATRIMONIO -->
+<section class="view" id="v-pat">
+  <h1>Patrimonio</h1>
+  <div class="hero">
+    <div class="lbl">Oggi</div>
+    <div class="big num" id="pTot">—</div>
+    <div class="row">
+      <div><span class="lbl">Ultimi 12 mesi</span><b class="num" id="p12">—</b></div>
+      <div><span class="lbl">Dal mese scorso</span><b class="num" id="p1">—</b></div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <div class="periods" id="pPer"><button data-p="12">1 anno</button><button data-p="36" class="on">3 anni</button><button data-p="0">Tutto</button></div>
+    <div class="chart" id="pChart"><div class="tip" id="pTip"></div></div>
+  </div>
+  <div class="grid3">
+    <div class="stat"><div class="l">Crescita periodo</div><div class="v num" id="pVar">—</div></div>
+    <div class="stat"><div class="l">Media al mese</div><div class="v num" id="pAvg">—</div></div>
+    <div class="stat"><div class="l">Massimo</div><div class="v num" id="pMax">—</div></div>
+  </div>
+  <h2>Composizione</h2>
+  <div class="card">
+    <div class="comp"><i id="cLiq" style="background:var(--brand)"></i><i id="cInv" style="background:var(--accent)"></i></div>
+    <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>Liquidità <b id="cLiqV">—</b></span><span><span class="dot" style="background:var(--accent)"></span>Investimenti <b id="cInvV">—</b></span></div>
+  </div>
+  <h2>Mese per mese</h2>
+  <div class="card list" id="pList"></div>
+</section>
+
 <!-- INVESTIMENTI -->
 <section class="view" id="v-inv">
   <h1>Investimenti</h1>
@@ -168,6 +209,7 @@ nav button.on{color:var(--brand)}
 <nav>
   <button data-v="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
   <button data-v="mov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Movimenti</button>
+  <button data-v="pat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 20h18"/><path d="M5 16l4-5 4 3 6-8"/><circle cx="19" cy="6" r="1.5"/></svg>Patrimonio</button>
   <button data-v="inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>Investimenti</button>
   <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Impostazioni</button>
 </nav>
@@ -399,6 +441,63 @@ $('invSave').onclick=async()=>{
   try{ await api('updateInvestimento',{},body); toast('Aggiornato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
 };
 
+/* ================== Patrimonio ================== */
+let P={dati:LS.get('storico_'+(DEMO()?'demo':'live')),per:36};
+const meseLbl=(m,lungo)=>{const [y,mm]=m.split('-').map(Number);return new Date(y,mm-1,1).toLocaleDateString('it-IT',lungo?{month:'long',year:'numeric'}:{month:'short',year:'2-digit'});};
+const pct=(a,b)=>b?((a-b)/Math.abs(b)*100):0;
+const segno=n=>(n>0?'+':'')+eur0(n);
+async function renderPat(){
+  if(P.dati) drawPat();
+  try{ P.dati=await api('storico'); LS.set('storico_'+(DEMO()?'demo':'live'),P.dati); drawPat(); }
+  catch(e){ if(!P.dati) $('pChart').innerHTML='<div class="empty">Non riesco a caricare: '+esc(e.message)+'</div>'; }
+}
+function drawPat(){
+  const all=P.dati.punti; if(!all||!all.length) return;
+  const last=all[all.length-1], byM={}; all.forEach(p=>byM[p.mese]=p);
+  const ago=(n)=>{const [y,m]=last.mese.split('-').map(Number);return byM[ym(new Date(y,m-1-n,1))];};
+  $('pTot').textContent=eur0(P.dati.attuale);
+  const a12=ago(12), a1=ago(1);
+  $('p12').textContent=a12?segno(last.valore-a12.valore)+' ('+(pct(last.valore,a12.valore)>=0?'+':'')+pct(last.valore,a12.valore).toFixed(1)+'%)':'—';
+  $('p1').textContent=a1?segno(last.valore-a1.valore):'—';
+  const pts=P.per?all.slice(-P.per-1):all;
+  const first=pts[0], d=last.valore-first.valore;
+  $('pVar').textContent=segno(d); $('pVar').className='v num '+(d>=0?'pos':'neg');
+  $('pAvg').textContent=segno(d/Math.max(1,pts.length-1)); $('pMax').textContent=eur0(Math.max(...pts.map(p=>p.valore)));
+  // grafico
+  const W=360,H=190,pl=4,pr=4,pt=12,pb=22; const vals=pts.map(p=>p.valore);
+  let mn=Math.min(...vals), mx=Math.max(...vals); const pad=(mx-mn)*.08||1; mn-=pad; mx+=pad;
+  const X=i=>pl+i*(W-pl-pr)/Math.max(1,pts.length-1), Y=v=>pt+(mx-v)*(H-pt-pb)/(mx-mn);
+  const line=pts.map((p,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(p.valore).toFixed(1)).join(' ');
+  const area=line+` L${X(pts.length-1).toFixed(1)} ${H-pb} L${X(0).toFixed(1)} ${H-pb} Z`;
+  const grid=[0,.5,1].map(f=>{const v=mx-(mx-mn)*f, y=Y(v);return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="3 4"/><text x="${W}" y="${y-3}" text-anchor="end" font-size="10" fill="var(--muted)">${Math.round(v/1000)}k</text>`;}).join('');
+  const step=Math.max(1,Math.round(pts.length/5));
+  const xl=pts.map((p,i)=>(i%step===0||i===pts.length-1)&&i!==pts.length-2?`<text x="${X(i)}" y="${H-6}" text-anchor="${i===0?'start':i===pts.length-1?'end':'middle'}" font-size="10" fill="var(--muted)">${meseLbl(p.mese)}</text>`:'').join('');
+  $('pChart').innerHTML=`<div class="tip" id="pTip"></div><svg viewBox="0 0 ${W} ${H}" id="pSvg">
+    <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--brand)" stop-opacity=".35"/><stop offset="1" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<path d="${area}" fill="url(#g1)"/><path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${xl}<line id="pCur" y1="${pt}" y2="${H-pb}" stroke="var(--muted)" stroke-width="1" style="display:none"/><circle id="pDot" r="4.5" fill="var(--brand)" stroke="var(--card)" stroke-width="2" style="display:none"/>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="pHit"/></svg>`;
+  const svg=$('pSvg'), tip=$('pTip');
+  const show=ev=>{const r=svg.getBoundingClientRect(); const cx=((ev.touches?ev.touches[0].clientX:ev.clientX)-r.left)*W/r.width;
+    const i=Math.max(0,Math.min(pts.length-1,Math.round((cx-pl)/((W-pl-pr)/Math.max(1,pts.length-1))))); const p=pts[i];
+    $('pCur').setAttribute('x1',X(i));$('pCur').setAttribute('x2',X(i));$('pCur').style.display='';
+    $('pDot').setAttribute('cx',X(i));$('pDot').setAttribute('cy',Y(p.valore));$('pDot').style.display='';
+    tip.style.display='block'; tip.style.left=Math.max(50,Math.min(r.width-50,X(i)*r.width/W))+'px'; tip.textContent=meseLbl(p.mese)+' · '+eur0(p.valore);};
+  const hide=()=>{tip.style.display='none';$('pCur').style.display='none';$('pDot').style.display='none';};
+  svg.addEventListener('pointermove',show); svg.addEventListener('touchmove',e=>{show(e);e.preventDefault();},{passive:false}); svg.addEventListener('pointerleave',hide); svg.addEventListener('touchend',()=>setTimeout(hide,1200));
+  // composizione
+  const liq=P.dati.liquidita||0, inv=P.dati.investimenti||0, tot=liq+inv||1;
+  $('cLiq').style.width=(liq/tot*100)+'%'; $('cInv').style.width=(inv/tot*100)+'%';
+  $('cLiqV').textContent=eur0(liq)+' · '+Math.round(liq/tot*100)+'%'; $('cInvV').textContent=eur0(inv)+' · '+Math.round(inv/tot*100)+'%';
+  // lista
+  $('pList').innerHTML=[...all].reverse().slice(0,36).map((p,i,arr)=>{const prev=arr[i+1]; const dv=prev?p.valore-prev.valore:null;
+    const ris=p.entrate!=null?p.entrate-p.uscite:null;
+    return `<div class="it"><div class="mid"><div class="t" style="text-transform:capitalize">${meseLbl(p.mese,true)}</div>
+      <div class="s">${ris!=null?'Risparmio '+segno(ris)+' · ':''}${p.nota?esc(p.nota):''}</div></div>
+      <div class="a num" style="text-align:right">${eur0(p.valore)}${dv!=null?`<small class="${dv>=0?'pos':'neg'}" style="display:block;font-size:12px;font-weight:500">${segno(dv)}</small>`:''}</div></div>`;}).join('');
+}
+$('pPer').onclick=e=>{const b=e.target.closest('button'); if(!b) return; P.per=+b.dataset.p; [...$('pPer').children].forEach(x=>x.classList.toggle('on',x===b)); drawPat();};
+
 /* ================== Navigazione ================== */
 document.querySelector('nav').onclick=e=>{
   const b=e.target.closest('button'); if(!b) return;
@@ -406,6 +505,7 @@ document.querySelector('nav').onclick=e=>{
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
   $('fab').style.display = b.dataset.v==='set'?'none':'';
   if(b.dataset.v==='mov') renderMov();
+  if(b.dataset.v==='pat') renderPat();
   window.scrollTo(0,0);
 };
 $('mPrev').onclick=()=>{ const [y,m]=S.mese.split('-').map(Number); S.mese=ym(new Date(y,m-2,1)); renderMov(); };
@@ -439,6 +539,9 @@ function demoApi(action, params, body){
     demo.movs.push({...body,importo:imp,tipo,id:'d'+Date.now()}); return Promise.resolve({}); }
   if(action==='deleteMovimento'){ demo.movs=demo.movs.filter(x=>x.id!==body.id); return Promise.resolve({}); }
   if(action==='updateInvestimento'){ const i=demo.inv.find(x=>x.nome===body.nome); Object.assign(i,body); i.valore=i.quote&&i.prezzo?i.quote*i.prezzo:(body.valore??i.valore); i.rendimento=i.versato?Math.round((i.valore-i.versato)/i.versato*10000)/100:null; return Promise.resolve({}); }
+  if(action==='storico'){ const pts=[]; const now=new Date(); let v=15000;
+    for(let i=47;i>=0;i--){ v=v*(1+(Math.sin(i)*0.012+0.008)); if(i===18) v+=8000; const d=new Date(now.getFullYear(),now.getMonth()-i,1); pts.push({mese:ym(d),valore:Math.round(v),nota:''}); }
+    return Promise.resolve({punti:pts,attuale:pts[pts.length-1].valore,liquidita:Math.round(v*0.8),investimenti:Math.round(v*0.2)}); }
   // dashboard
   const ms=demo.movs, ent=ms.filter(x=>tipoOf(x)==='entrate').reduce((s,x)=>s+x.importo,0), usc=-ms.filter(x=>tipoOf(x)==='uscite').reduce((s,x)=>s+x.importo,0);
   const sp={}; ms.filter(x=>tipoOf(x)==='uscite').forEach(x=>sp[x.categoria]=(sp[x.categoria]||0)-x.importo);
