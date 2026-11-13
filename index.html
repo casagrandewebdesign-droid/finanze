@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Finanze">
+<meta name="theme-color" content="#0f1f1a">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-512.png">
+<title>Finanze</title>
+<style>
+:root{
+  --bg:#f3f1ec; --card:#ffffff; --ink:#15211d; --muted:#6d7772; --line:#e6e2da;
+  --brand:#0f5c46; --brand-ink:#ffffff; --accent:#d9f26b;
+  --pos:#16855f; --neg:#c2412d; --warn:#c98a10;
+  --r:18px; --shadow:0 1px 2px rgba(0,0,0,.04),0 4px 16px rgba(0,0,0,.05);
+  --safe-b:env(safe-area-inset-bottom,0px); --safe-t:env(safe-area-inset-top,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0d1412;--card:#161f1c;--ink:#eef2ef;--muted:#8d9893;--line:#24302c;--brand:#2fa37f;--shadow:none}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif}
+body{padding:calc(var(--safe-t) + 8px) 16px calc(var(--safe-b) + 96px);min-height:100vh}
+h1{font-size:28px;letter-spacing:-.02em;margin:8px 0 14px}
+h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 4px 8px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.card{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--shadow)}
+.hero{background:var(--brand);color:var(--brand-ink);border-radius:24px;padding:20px;position:relative;overflow:hidden}
+.hero:after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:var(--accent);opacity:.18}
+.hero .lbl{opacity:.75;font-size:13px}
+.hero .big{font-size:36px;font-weight:700;letter-spacing:-.02em;margin:2px 0 12px}
+.hero .row{display:flex;gap:18px;font-size:14px}
+.hero .row b{display:block;font-size:17px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.stat{background:var(--card);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.stat .l{font-size:12px;color:var(--muted)}
+.stat .v{font-size:17px;font-weight:650;margin-top:2px}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+.daily{display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.daily .v{font-size:22px;font-weight:700}
+.bar{height:8px;background:var(--line);border-radius:8px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:8px}
+.bar i.warn{background:var(--warn)}.bar i.over{background:var(--neg)}
+.bud{padding:10px 0;border-bottom:1px solid var(--line)}
+.bud:last-child{border:0}
+.bud .top{display:flex;justify-content:space-between;font-size:15px}
+.bud .sub{font-size:12px;color:var(--muted);margin-top:3px}
+.list .it{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line)}
+.list .it:last-child{border:0}
+.ic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:18px;background:var(--bg);flex:none}
+.it .mid{flex:1;min-width:0}
+.it .t{font-weight:550;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .s{font-size:12px;color:var(--muted)}
+.it .a{font-weight:650}
+.flag{font-size:11px;background:#fbe9c6;color:#7a5306;padding:1px 6px;border-radius:6px;margin-left:4px}
+.empty{color:var(--muted);text-align:center;padding:24px 0}
+nav{position:fixed;left:0;right:0;bottom:0;background:color-mix(in srgb,var(--card) 88%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 8px calc(var(--safe-b) + 6px);z-index:5}
+nav button{background:none;border:0;color:var(--muted);font-size:11px;display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 10px;font-weight:550}
+nav button svg{width:24px;height:24px}
+nav button.on{color:var(--brand)}
+.fab{position:fixed;right:18px;bottom:calc(var(--safe-b) + 78px);width:60px;height:60px;border-radius:20px;background:var(--brand);color:#fff;border:0;font-size:32px;box-shadow:0 8px 24px rgba(15,92,70,.35);z-index:6}
+.monthsw{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.monthsw button{background:var(--card);border:0;width:38px;height:38px;border-radius:12px;font-size:18px;color:var(--ink);box-shadow:var(--shadow)}
+.monthsw span{font-weight:650;text-transform:capitalize}
+/* Sheet */
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:.2s;z-index:10}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-radius:24px 24px 0 0;padding:10px 16px calc(var(--safe-b) + 16px);transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);z-index:11;max-height:92vh;overflow:auto}
+.open .sheet-bg{opacity:1;pointer-events:auto}.open .sheet{transform:none}
+.grab{width:40px;height:5px;border-radius:5px;background:var(--line);margin:0 auto 12px}
+.seg{display:flex;background:var(--card);border-radius:14px;padding:4px;box-shadow:var(--shadow)}
+.seg button{flex:1;border:0;background:none;padding:9px;border-radius:10px;font-weight:600;color:var(--muted);font-size:15px}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.amount{display:flex;align-items:baseline;justify-content:center;gap:6px;margin:18px 0 10px}
+.amount span{font-size:28px;color:var(--muted)}
+.amount input{font-size:48px;font-weight:700;border:0;background:none;color:var(--ink);width:70%;text-align:center;outline:none;font-variant-numeric:tabular-nums}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.chip{border:1px solid var(--line);background:var(--card);border-radius:20px;padding:7px 12px;font-size:14px;color:var(--ink)}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.field{background:var(--card);border-radius:14px;padding:4px 14px;margin-top:8px;display:flex;align-items:center;gap:10px;box-shadow:var(--shadow)}
+.field label{font-size:13px;color:var(--muted);width:90px;flex:none}
+.field input,.field select{flex:1;border:0;background:none;font-size:16px;padding:11px 0;color:var(--ink);outline:none;font-family:inherit;min-width:0}
+.btn{width:100%;margin-top:14px;border:0;border-radius:16px;padding:15px;font-size:17px;font-weight:650;background:var(--brand);color:#fff}
+.btn.ghost{background:var(--card);color:var(--ink);box-shadow:var(--shadow)}
+.btn.danger{background:none;color:var(--neg)}
+.toast{position:fixed;left:50%;top:calc(var(--safe-t) + 12px);transform:translate(-50%,-80px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:14px;font-size:14px;transition:.25s;z-index:20;max-width:90%}
+.toast.show{transform:translate(-50%,0)}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:8px;background:var(--line);color:var(--muted)}
+.demo{background:#fff4d1;color:#6b4e00;border-radius:12px;padding:8px 12px;font-size:13px;margin-bottom:10px}
+.view{display:none}.view.on{display:block;animation:fade .2s}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1}}
+.inv .it .a{text-align:right}
+.inv .it .a small{display:block;font-size:12px;font-weight:500}
+.sync{font-size:12px;color:var(--muted);text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+
+<div id="demoBanner" class="demo" hidden>Modalità demo: dati di esempio. Collega il tuo motore da <b>Impostazioni</b>.</div>
+
+<!-- HOME -->
+<section class="view on" id="v-home">
+  <h1>Ciao Federico</h1>
+  <div class="hero">
+    <div class="lbl">Patrimonio</div>
+    <div class="big num" id="hPatr">—</div>
+    <div class="row">
+      <div><span class="lbl">Liquidità</span><b class="num" id="hLiq">—</b></div>
+      <div><span class="lbl">Investimenti</span><b class="num" id="hInv">—</b></div>
+    </div>
+  </div>
+  <div class="grid3">
+    <div class="stat"><div class="l">Entrate</div><div class="v num pos" id="sEnt">—</div></div>
+    <div class="stat"><div class="l">Uscite</div><div class="v num neg" id="sUsc">—</div></div>
+    <div class="stat"><div class="l">Risparmio</div><div class="v num" id="sRis">—</div></div>
+  </div>
+  <div class="card" style="margin-top:10px">
+    <div class="daily">
+      <div><div class="stat l" style="padding:0;box-shadow:none">Puoi spendere al giorno</div><div class="v num" id="dDay">—</div></div>
+      <div style="text-align:right"><div class="stat l" style="padding:0;box-shadow:none">Budget residuo</div><div class="num" id="dRes" style="font-weight:650">—</div></div>
+    </div>
+    <div class="bar"><i id="dBar" style="width:0"></i></div>
+  </div>
+  <h2>Budget del mese</h2>
+  <div class="card" id="budList"></div>
+  <h2>Ultimi movimenti</h2>
+  <div class="card list" id="lastList"></div>
+  <div class="sync" id="syncInfo"></div>
+</section>
+
+<!-- MOVIMENTI -->
+<section class="view" id="v-mov">
+  <h1>Movimenti</h1>
+  <div class="monthsw"><button id="mPrev">‹</button><span id="mLbl"></span><button id="mNext">›</button></div>
+  <div class="card list" id="movList"></div>
+</section>
+
+<!-- INVESTIMENTI -->
+<section class="view" id="v-inv">
+  <h1>Investimenti</h1>
+  <div class="hero" style="margin-bottom:12px">
+    <div class="lbl">Valore totale</div>
+    <div class="big num" id="iTot" style="margin-bottom:0">—</div>
+  </div>
+  <div class="card list inv" id="invList"></div>
+  <p class="sync">Tocca un investimento per aggiornare prezzo o valore.</p>
+</section>
+
+<!-- IMPOSTAZIONI -->
+<section class="view" id="v-set">
+  <h1>Impostazioni</h1>
+  <h2>Collegamento al motore</h2>
+  <div class="field"><label>URL motore</label><input id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off" autocapitalize="off"></div>
+  <div class="field"><label>Token</label><input id="cfgTok" type="password" placeholder="token segreto" autocomplete="off" autocapitalize="off"></div>
+  <button class="btn" id="cfgSave">Salva e collega</button>
+  <button class="btn ghost" id="cfgDemo">Usa dati demo</button>
+  <h2>Conti</h2>
+  <div class="card list" id="contiList"></div>
+  <p class="sync">I dati vivono nel tuo foglio "Finanze App - Database" su Google Drive.</p>
+</section>
+
+<button class="fab" id="fab" aria-label="Nuovo movimento">+</button>
+
+<nav>
+  <button data-v="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
+  <button data-v="mov"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Movimenti</button>
+  <button data-v="inv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>Investimenti</button>
+  <button data-v="set"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Impostazioni</button>
+</nav>
+
+<!-- SHEET: nuovo movimento -->
+<div id="sheetAdd">
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div class="seg" id="segTipo">
+      <button data-s="uscita" class="on">Uscita</button>
+      <button data-s="entrata">Entrata</button>
+      <button data-s="mov">Investimento</button>
+    </div>
+    <div class="amount"><span>€</span><input id="aImp" inputmode="decimal" placeholder="0,00"></div>
+    <div class="chips" id="aCats"></div>
+    <div class="field"><label>Descrizione</label><input id="aDesc" placeholder="es. Esselunga"></div>
+    <div class="field"><label>Data</label><input id="aData" type="date"></div>
+    <div class="field"><label>Conto</label><select id="aConto"></select></div>
+    <button class="btn" id="aSave">Salva</button>
+  </div>
+</div>
+
+<!-- SHEET: dettaglio movimento -->
+<div id="sheetDet">
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <div id="detBody"></div>
+    <button class="btn danger" id="detDel">Elimina movimento</button>
+    <button class="btn ghost" data-close>Chiudi</button>
+  </div>
+</div>
+
+<!-- SHEET: investimento -->
+<div id="sheetInv">
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 id="invNome" style="margin-top:4px;text-transform:none;font-size:17px;color:var(--ink)"></h2>
+    <div class="field"><label>Prezzo quota</label><input id="invPrezzo" inputmode="decimal" placeholder="lascia vuoto se non serve"></div>
+    <div class="field"><label>Quote</label><input id="invQuote" inputmode="decimal"></div>
+    <div class="field"><label>Valore</label><input id="invValore" inputmode="decimal" placeholder="se non hai il prezzo quota"></div>
+    <div class="field"><label>Versato</label><input id="invVers" inputmode="decimal" placeholder="per calcolare il rendimento"></div>
+    <button class="btn" id="invSave">Aggiorna</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ================== Stato & config ================== */
+const LS = {
+  get:(k,d)=>{try{const v=localStorage.getItem('fin_'+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set:(k,v)=>{try{localStorage.setItem('fin_'+k,JSON.stringify(v))}catch(e){}}
+};
+const S = { cfg: LS.get('cfg',{url:'',token:''}), config:null, dash:null, mese: ym(new Date()), segno:'uscita', cat:'', queue: LS.get('queue',[]) };
+const DEMO = () => !S.cfg.url || !S.cfg.token;
+
+function ym(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+function today(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const eur = (n,dec=2)=> (n<0?'−':'')+'€ '+Math.abs(n||0).toLocaleString('it-IT',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+const eur0 = n => eur(n,0);
+const parseNum = s => { s=String(s||'').trim().replace(/\s/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); return parseFloat(s)||0; };
+const $ = id => document.getElementById(id);
+const esc = s => String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+const ICONS = {'Ristoranti e bar':'🍽️','Carburanti':'⛽','Generi alimentari e supermercato':'🛒','Salute & Benessere':'💪','Abbonamenti':'🔁','Tempo libero varie':'🎟️','Trasporti & Parcheggi':'🚗','Imposte, bolli e commissioni':'🏛️','Finanziamenti':'🏦','Regali':'🎁','Vacanze':'✈️','Famiglia':'👪','Altre uscite':'📦','Bonifici in uscita':'↗️','Stipendi e pensioni':'💼','Bonifici ricevuti':'↙️','Dividendi':'📈','Entrate varie':'➕','Regali ricevuti':'🎁','Investimenti, BDR e XME Salvadanaio':'🌱'};
+const icon = c => ICONS[c] || '•';
+
+/* ================== API ================== */
+async function api(action, params={}, body=null){
+  if (DEMO()) return demoApi(action, params, body);
+  const u = new URL(S.cfg.url);
+  if (!body){
+    u.searchParams.set('action',action); u.searchParams.set('token',S.cfg.token);
+    Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
+    const r = await fetch(u); const j = await r.json();
+    if(!j.ok) throw new Error(j.error); return j.data;
+  }
+  // POST "semplice" (text/plain) → niente preflight CORS con Apps Script
+  const r = await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:S.cfg.token,data:body})});
+  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+}
+
+/* coda offline: se manca la rete il movimento resta in attesa e parte dopo */
+async function flushQueue(){
+  if (DEMO() || !S.queue.length) return;
+  const rest=[];
+  for (const m of S.queue){ try{ await api('addMovimento',{},m) }catch(e){ rest.push(m) } }
+  S.queue=rest; LS.set('queue',rest);
+}
+
+/* ================== Caricamento ================== */
+async function load(){
+  $('demoBanner').hidden = !DEMO();
+  // mostra subito l'ultima versione salvata
+  const cached = LS.get('dash_'+(DEMO()?'demo':'live'));
+  if (cached){ S.dash=cached; renderHome(); }
+  try{
+    await flushQueue();
+    const [config, dash] = await Promise.all([api('config'), api('dashboard',{mese:ym(new Date())})]);
+    S.config=config; S.dash=dash; LS.set('dash_'+(DEMO()?'demo':'live'),dash); LS.set('config',config);
+    renderHome(); renderInv(); renderConti(); fillForm();
+    $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
+  }catch(e){
+    S.config = S.config || LS.get('config'); fillForm();
+    $('syncInfo').textContent = 'Offline o motore non raggiungibile: '+e.message;
+  }
+}
+
+/* ================== Render ================== */
+function renderHome(){
+  const d=S.dash; if(!d) return;
+  $('hPatr').textContent=eur0(d.patrimonio); $('hLiq').textContent=eur0(d.liquidita); $('hInv').textContent=eur0(d.investimentiTotale);
+  $('sEnt').textContent=eur0(d.entrate); $('sUsc').textContent=eur0(d.uscite);
+  $('sRis').textContent = d.tassoRisparmio==null?'—':Math.round(d.tassoRisparmio)+'%';
+  $('dDay').textContent = d.alGiorno==null?'—':eur(d.alGiorno);
+  $('dRes').textContent = eur0(d.budgetResiduo)+' / '+eur0(d.budgetTotale);
+  const used = d.budgetTotale? Math.min(1,(d.budgetTotale-d.budgetResiduo)/d.budgetTotale):0;
+  $('dBar').style.width=(used*100)+'%'; $('dBar').className = used>1?'over':used>.85?'warn':'';
+  $('budList').innerHTML = d.budget.filter(b=>b.budget>0||b.speso>0).map(b=>{
+    const u=b.budget? b.speso/b.budget : 1; const cls=u>1?'over':u>.85?'warn':'';
+    return `<div class="bud"><div class="top"><span>${icon(b.categoria)} ${esc(b.categoria)}</span><span class="num">${eur0(b.speso)} <span style="color:var(--muted)">/ ${eur0(b.budget)}</span></span></div>
+    <div class="bar"><i class="${cls}" style="width:${Math.min(100,u*100)}%"></i></div>
+    <div class="sub">${b.residuo>=0?'Restano '+eur(b.residuo):'Superato di '+eur(-b.residuo)}</div></div>`;
+  }).join('') || '<div class="empty">Nessun budget impostato</div>';
+  $('lastList').innerHTML = movRows(d.ultimi) || '<div class="empty">Ancora nessun movimento questo mese</div>';
+}
+
+function movRows(list){
+  return (list||[]).map(m=>`<div class="it" data-mov='${esc(JSON.stringify(m))}'>
+    <div class="ic">${icon(m.categoria)}</div>
+    <div class="mid"><div class="t">${esc(m.descrizione||m.categoria||'Movimento')}${/VERIFICARE/.test(m.fonte||'')?'<span class="flag">da verificare</span>':''}</div>
+    <div class="s">${esc(m.categoria||'Senza categoria')} · ${new Date(m.data+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</div></div>
+    <div class="a num ${m.importo>=0?'pos':''}">${m.importo>=0?'+':''}${eur(m.importo)}</div></div>`).join('');
+}
+
+async function renderMov(){
+  const [y,mm]=S.mese.split('-').map(Number);
+  $('mLbl').textContent=new Date(y,mm-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+  $('movList').innerHTML='<div class="empty">Carico…</div>';
+  try{ const list=await api('movimenti',{mese:S.mese}); $('movList').innerHTML=movRows(list)||'<div class="empty">Nessun movimento</div>'; }
+  catch(e){ $('movList').innerHTML='<div class="empty">Non riesco a caricare: '+esc(e.message)+'</div>'; }
+}
+
+function renderInv(){
+  const d=S.dash; if(!d) return;
+  $('iTot').textContent=eur(d.investimentiTotale);
+  $('invList').innerHTML = d.investimenti.map(i=>`<div class="it" data-inv='${esc(JSON.stringify(i))}'>
+    <div class="ic">📈</div>
+    <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${i.quote?i.quote.toLocaleString('it-IT')+' quote × '+eur(i.prezzo):'valore manuale'} · agg. ${i.aggiornato?new Date(i.aggiornato+'T12:00').toLocaleDateString('it-IT'):'—'}</div></div>
+    <div class="a num">${eur0(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${i.rendimento.toLocaleString('it-IT')}%</small>`:''}</div></div>`).join('') || '<div class="empty">Nessun investimento</div>';
+}
+
+function renderConti(){
+  const d=S.dash; if(!d) return;
+  $('contiList').innerHTML = d.conti.map(c=>`<div class="it"><div class="ic">🏦</div><div class="mid"><div class="t">${esc(c.nome)}</div><div class="s">${esc(c.tipo)}</div></div><div class="a num">${eur(c.saldo)}</div></div>`).join('');
+  $('cfgUrl').value=S.cfg.url; $('cfgTok').value=S.cfg.token;
+}
+
+/* ================== Form nuovo movimento ================== */
+function fillForm(){
+  const c=S.config; if(!c) return;
+  const want = S.segno==='entrata'?'entrate':S.segno==='mov'?'mov':'uscite';
+  const cats=c.categorie.filter(x=>x.tipo===want);
+  if(!cats.find(x=>x.nome===S.cat)) S.cat = cats.length===1?cats[0].nome:'';
+  $('aCats').innerHTML=cats.map(x=>`<button class="chip ${x.nome===S.cat?'on':''}" data-cat="${esc(x.nome)}">${icon(x.nome)} ${esc(x.nome)}</button>`).join('');
+  const sel=$('aConto'), prev=sel.value;
+  sel.innerHTML=c.conti.map(x=>`<option>${esc(x.nome)}</option>`).join(''); if(prev) sel.value=prev;
+}
+function openSheet(id){ $(id).classList.add('open'); }
+function closeSheets(){ document.querySelectorAll('.open').forEach(e=>e.classList.remove('open')); }
+
+$('fab').onclick=()=>{ $('aImp').value=''; $('aDesc').value=''; $('aData').value=today(); S.cat=''; fillForm(); openSheet('sheetAdd'); setTimeout(()=>$('aImp').focus(),250); };
+$('segTipo').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; S.segno=b.dataset.s; [...$('segTipo').children].forEach(x=>x.classList.toggle('on',x===b)); fillForm(); };
+$('aCats').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; S.cat=b.dataset.cat; fillForm(); };
+$('aSave').onclick=async()=>{
+  const imp=parseNum($('aImp').value); if(!imp){ toast('Inserisci un importo'); return; }
+  const mov={ data:$('aData').value||today(), importo:imp, segno:S.segno==='entrata'?'entrata':'uscita', tipo:S.segno==='mov'?'mov':undefined, categoria:S.cat, conto:$('aConto').value, descrizione:$('aDesc').value.trim(), fonte:'App' };
+  closeSheets(); toast('Salvato ✓');
+  try{ await api('addMovimento',{},mov); }
+  catch(e){ S.queue.push(mov); LS.set('queue',S.queue); toast('Offline: lo invio appena torna la rete'); }
+  load(); if($('v-mov').classList.contains('on')) renderMov();
+};
+
+/* dettaglio / elimina */
+let detMov=null;
+document.addEventListener('click',e=>{
+  const row=e.target.closest('[data-mov]');
+  if(row){ detMov=JSON.parse(row.dataset.mov);
+    $('detBody').innerHTML=`<div style="text-align:center;margin:6px 0 14px"><div style="font-size:40px">${icon(detMov.categoria)}</div>
+    <div class="num" style="font-size:34px;font-weight:700" >${eur(detMov.importo)}</div><div style="color:var(--muted)">${esc(detMov.descrizione||'')}</div></div>
+    <div class="card list">
+      <div class="it"><div class="mid s">Categoria</div><div>${esc(detMov.categoria||'—')}</div></div>
+      <div class="it"><div class="mid s">Data</div><div>${new Date(detMov.data+'T12:00').toLocaleDateString('it-IT')}</div></div>
+      <div class="it"><div class="mid s">Conto</div><div>${esc(detMov.conto||'—')}</div></div>
+      <div class="it"><div class="mid s">Fonte</div><div><span class="pill">${esc(detMov.fonte||'—')}</span></div></div></div>`;
+    openSheet('sheetDet'); return; }
+  const inv=e.target.closest('[data-inv]');
+  if(inv){ const i=JSON.parse(inv.dataset.inv); $('invNome').textContent=i.nome;
+    $('invPrezzo').value=i.prezzo?String(i.prezzo).replace('.',','):''; $('invQuote').value=i.quote?String(i.quote).replace('.',','):'';
+    $('invValore').value=''; $('invVers').value=i.versato?String(i.versato).replace('.',','):''; openSheet('sheetInv'); return; }
+  if(e.target.closest('[data-close]')) closeSheets();
+});
+$('detDel').onclick=async()=>{ if(!detMov) return; closeSheets();
+  try{ await api('deleteMovimento',{},{id:detMov.id}); toast('Eliminato'); load(); renderMov(); }catch(e){ toast('Errore: '+e.message); } };
+$('invSave').onclick=async()=>{
+  const body={nome:$('invNome').textContent};
+  if($('invPrezzo').value) body.prezzo=parseNum($('invPrezzo').value);
+  if($('invQuote').value) body.quote=parseNum($('invQuote').value);
+  if($('invValore').value) body.valore=parseNum($('invValore').value);
+  if($('invVers').value) body.versato=parseNum($('invVers').value);
+  closeSheets();
+  try{ await api('updateInvestimento',{},body); toast('Aggiornato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
+};
+
+/* ================== Navigazione ================== */
+document.querySelector('nav').onclick=e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
+  $('fab').style.display = b.dataset.v==='set'?'none':'';
+  if(b.dataset.v==='mov') renderMov();
+  window.scrollTo(0,0);
+};
+$('mPrev').onclick=()=>{ const [y,m]=S.mese.split('-').map(Number); S.mese=ym(new Date(y,m-2,1)); renderMov(); };
+$('mNext').onclick=()=>{ const [y,m]=S.mese.split('-').map(Number); S.mese=ym(new Date(y,m,1)); renderMov(); };
+$('cfgSave').onclick=()=>{ S.cfg={url:$('cfgUrl').value.trim(),token:$('cfgTok').value.trim()}; LS.set('cfg',S.cfg); toast(DEMO()?'Modalità demo':'Collegato, carico i dati…'); load(); };
+$('cfgDemo').onclick=()=>{ S.cfg={url:'',token:''}; LS.set('cfg',S.cfg); load(); toast('Modalità demo'); };
+
+let tt; function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>el.classList.remove('show'),2200); }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(); });
+
+/* ================== Modalità demo (dati di esempio, solo in memoria) ================== */
+const demo = (()=> {
+  const m=ym(new Date()), d=n=>m+'-'+String(n).padStart(2,'0');
+  const cat=[['entrate','Stipendi e pensioni',0],['entrate','Entrate varie',0],['mov','Investimenti, BDR e XME Salvadanaio',0],['uscite','Ristoranti e bar',250],['uscite','Tempo libero varie',250],['uscite','Finanziamenti',205],['uscite','Carburanti',120],['uscite','Salute & Benessere',200],['uscite','Abbonamenti',20],['uscite','Trasporti & Parcheggi',20],['uscite','Generi alimentari e supermercato',0],['uscite','Altre uscite',50]];
+  return { categorie:cat.map(([tipo,nome,budget])=>({tipo,nome,budget})), conti:[{nome:'Conto principale',tipo:'liquidità',saldo:12500},{nome:'Broker',tipo:'liquidità',saldo:0}],
+    movs:[
+      {id:'d1',data:d(2),importo:1450,tipo:'entrate',categoria:'Stipendi e pensioni',descrizione:'Stipendio',conto:'Conto principale',fonte:'App'},
+      {id:'d2',data:d(3),importo:-58.2,tipo:'uscite',categoria:'Carburanti',descrizione:'ENI',conto:'Conto principale',fonte:'SMS'},
+      {id:'d3',data:d(4),importo:-23.5,tipo:'uscite',categoria:'Ristoranti e bar',descrizione:'Pizzeria',conto:'Conto principale',fonte:'App'},
+      {id:'d4',data:d(5),importo:-100,tipo:'mov',categoria:'Investimenti, BDR e XME Salvadanaio',descrizione:'PAC mensile',conto:'Conto principale',fonte:'App'},
+      {id:'d5',data:d(6),importo:-9.99,tipo:'uscite',categoria:'Abbonamenti',descrizione:'Spotify',conto:'Conto principale',fonte:'SMS'},
+      {id:'d6',data:d(7),importo:-45,tipo:'uscite',categoria:'Salute & Benessere',descrizione:'Farmacia',conto:'Conto principale',fonte:'SMS · DA VERIFICARE'},
+    ],
+    inv:[{nome:'Fondo obbligazionario',codice:'',quote:150,prezzo:11.3,valore:1695,versato:1650,rendimento:2.73,aggiornato:d(1)},{nome:'Piano di accumulo',codice:'',quote:0,prezzo:0,valore:4000,versato:3800,rendimento:5.26,aggiornato:d(1)}]};
+})();
+function demoApi(action, params, body){
+  const tipoOf=m=>m.tipo||(m.importo>=0?'entrate':'uscite');
+  if(action==='config') return Promise.resolve({categorie:demo.categorie,conti:demo.conti});
+  if(action==='movimenti') return Promise.resolve(demo.movs.filter(x=>x.data.startsWith(params.mese)).sort((a,b)=>a.data<b.data?1:-1));
+  if(action==='addMovimento'){ let imp=Math.abs(body.importo); const tipo=body.tipo||(body.segno==='entrata'?'entrate':'uscite'); if(tipo!=='entrate') imp=-imp;
+    demo.movs.push({...body,importo:imp,tipo,id:'d'+Date.now()}); return Promise.resolve({}); }
+  if(action==='deleteMovimento'){ demo.movs=demo.movs.filter(x=>x.id!==body.id); return Promise.resolve({}); }
+  if(action==='updateInvestimento'){ const i=demo.inv.find(x=>x.nome===body.nome); Object.assign(i,body); i.valore=i.quote&&i.prezzo?i.quote*i.prezzo:(body.valore??i.valore); i.rendimento=i.versato?Math.round((i.valore-i.versato)/i.versato*10000)/100:null; return Promise.resolve({}); }
+  // dashboard
+  const ms=demo.movs, ent=ms.filter(x=>tipoOf(x)==='entrate').reduce((s,x)=>s+x.importo,0), usc=-ms.filter(x=>tipoOf(x)==='uscite').reduce((s,x)=>s+x.importo,0);
+  const sp={}; ms.filter(x=>tipoOf(x)==='uscite').forEach(x=>sp[x.categoria]=(sp[x.categoria]||0)-x.importo);
+  const budget=demo.categorie.filter(c=>c.tipo==='uscite'&&(c.budget||sp[c.nome])).map(c=>({categoria:c.nome,budget:c.budget,speso:sp[c.nome]||0,residuo:c.budget-(sp[c.nome]||0)})).sort((a,b)=>(b.speso/(b.budget||1))-(a.speso/(a.budget||1)));
+  const bt=budget.reduce((s,b)=>s+b.budget,0), bs=budget.filter(b=>b.budget).reduce((s,b)=>s+b.speso,0);
+  const now=new Date(), left=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate()+1;
+  const liq=demo.conti.reduce((s,c)=>s+c.saldo,0)+ms.reduce((s,x)=>s+x.importo,0), inv=demo.inv.reduce((s,i)=>s+i.valore,0);
+  return Promise.resolve({patrimonio:liq+inv,liquidita:liq,investimentiTotale:inv,conti:demo.conti,investimenti:demo.inv,entrate:ent,uscite:usc,saldo:ent-usc,
+    tassoRisparmio:ent?(ent-usc)/ent*100:null,budget,budgetTotale:bt,budgetResiduo:bt-bs,alGiorno:Math.max(0,bt-bs)/left,ultimi:[...ms].sort((a,b)=>a.data<b.data?1:-1).slice(0,8)});
+}
+
+/* ================== Avvio ================== */
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+load();
+</script>
+</body>
+</html>
