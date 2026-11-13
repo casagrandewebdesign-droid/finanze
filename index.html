@@ -287,7 +287,10 @@ const icon = c => ICONS[c] || '•';
 
 /* ================== API ================== */
 async function api(action, params={}, body=null){
-  if (DEMO()) return demoApi(action, params, body);
+  if (DEMO()) {
+    if (action==='init') { const [c,d,m]=await Promise.all([demoApi('config'),demoApi('dashboard',params),demoApi('movimenti',params)]); return {config:c,dashboard:d,movimenti:m}; }
+    return demoApi(action, params, body);
+  }
   const u = new URL(S.cfg.url);
   if (!body){
     u.searchParams.set('action',action); u.searchParams.set('token',S.cfg.token);
@@ -316,9 +319,15 @@ async function load(){
   if (cached){ S.dash=cached; renderHome(); }
   try{
     await flushQueue();
-    const [config, dash] = await Promise.all([api('config'), api('dashboard',{mese:ym(new Date())})]);
+    const mese=ym(new Date());
+    const r = await api('init',{mese});
+    const config=r.config, dash=r.dashboard;
+    LS.set('mov_'+(DEMO()?'demo_':'')+mese, r.movimenti);
     S.config=config; S.dash=dash; LS.set('dash_'+(DEMO()?'demo':'live'),dash); LS.set('config',config);
     renderHome(); renderInv(); renderConti(); fillForm();
+    if($('v-mov').classList.contains('on')) renderMov();
+    // in background: prepara lo storico così la scheda Patrimonio si apre subito
+    api('storico').then(st=>{ P.dati=st; LS.set('storico_'+(DEMO()?'demo':'live'),st); if($('v-pat').classList.contains('on')) drawPat(); }).catch(()=>{});
     $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
   }catch(e){
     S.config = S.config || LS.get('config'); fillForm();
@@ -356,9 +365,10 @@ function movRows(list){
 async function renderMov(){
   const [y,mm]=S.mese.split('-').map(Number);
   $('mLbl').textContent=new Date(y,mm-1,1).toLocaleDateString('it-IT',{month:'long',year:'numeric'});
-  $('movList').innerHTML='<div class="empty">Carico…</div>';
-  try{ const list=await api('movimenti',{mese:S.mese}); $('movList').innerHTML=movRows(list)||'<div class="empty">Nessun movimento</div>'; }
-  catch(e){ $('movList').innerHTML='<div class="empty">Non riesco a caricare: '+esc(e.message)+'</div>'; }
+  const key='mov_'+(DEMO()?'demo_':'')+S.mese, mese=S.mese, cached=LS.get(key);
+  $('movList').innerHTML = cached ? (movRows(cached)||'<div class="empty">Nessun movimento</div>') : '<div class="empty">Carico…</div>';
+  try{ const list=await api('movimenti',{mese}); LS.set(key,list); if(S.mese===mese) $('movList').innerHTML=movRows(list)||'<div class="empty">Nessun movimento</div>'; }
+  catch(e){ if(!cached) $('movList').innerHTML='<div class="empty">Non riesco a caricare: '+esc(e.message)+'</div>'; }
 }
 
 function renderInv(){
