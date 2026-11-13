@@ -197,8 +197,13 @@ nav button.on{color:var(--brand)}
   <div class="sheet">
     <div class="grab"></div>
     <div id="detBody"></div>
+    <div class="amount" style="margin:6px 0"><span>€</span><input id="eImp" inputmode="decimal"></div>
+    <div class="field"><label>Categoria</label><select id="eCat"></select></div>
+    <div class="field"><label>Descrizione</label><input id="eDesc"></div>
+    <div class="field"><label>Data</label><input id="eData" type="date"></div>
+    <button class="btn" id="detConf" style="background:var(--pos)">✓ Conferma movimento</button>
+    <button class="btn" id="detSave">Salva modifiche</button>
     <button class="btn danger" id="detDel">Elimina movimento</button>
-    <button class="btn ghost" data-close>Chiudi</button>
   </div>
 </div>
 
@@ -359,14 +364,15 @@ let detMov=null;
 document.addEventListener('click',e=>{
   const row=e.target.closest('[data-mov]');
   if(row){ detMov=JSON.parse(row.dataset.mov);
-    $('detBody').innerHTML=`<div style="text-align:center;margin:6px 0 14px"><div style="font-size:40px">${icon(detMov.categoria)}</div>
-    <div class="num" style="font-size:34px;font-weight:700" >${eur(detMov.importo)}</div><div style="color:var(--muted)">${esc(detMov.descrizione||'')}</div></div>
-    <div class="card list">
-      <div class="it"><div class="mid s">Categoria</div><div>${esc(detMov.categoria||'—')}</div></div>
-      <div class="it"><div class="mid s">Data</div><div>${detMov.senzaData?new Date(detMov.data+'T12:00').toLocaleDateString('it-IT',{month:'long',year:'numeric'}):new Date(detMov.data+'T12:00').toLocaleDateString('it-IT')}</div></div>
-      <div class="it"><div class="mid s">Conto</div><div>${esc(detMov.conto||'—')}</div></div>
-      <div class="it"><div class="mid s">Fonte</div><div><span class="pill">${esc(detMov.fonte||'—')}</span></div></div></div>`;
-    $('detDel').style.display = detMov.soloLettura ? 'none' : '';
+    const daVer=/VERIFICARE/.test(detMov.fonte||'');
+    $('detBody').innerHTML=`<div style="text-align:center;margin:2px 0 4px"><div style="font-size:34px">${icon(detMov.categoria)}</div>
+      <div style="color:var(--muted);font-size:13px">${esc(detMov.fonte||'')}${daVer?' <span class="flag">da verificare</span>':''}</div></div>`;
+    $('eImp').value=String(Math.abs(detMov.importo)).replace('.',',');
+    const cats=(S.config&&S.config.categorie)||[]; 
+    $('eCat').innerHTML=(cats.find(c=>c.nome===detMov.categoria)?'':`<option>${esc(detMov.categoria||'')}</option>`)+cats.map(c=>`<option ${c.nome===detMov.categoria?'selected':''}>${esc(c.nome)}</option>`).join('');
+    $('eDesc').value=detMov.descrizione||''; $('eData').value=detMov.senzaData?'':detMov.data;
+    $('eData').placeholder=detMov.senzaData?'giorno non indicato':'';
+    $('detConf').style.display=daVer?'':'none';
     openSheet('sheetDet'); return; }
   const inv=e.target.closest('[data-inv]');
   if(inv){ const i=JSON.parse(inv.dataset.inv); $('invNome').textContent=i.nome;
@@ -374,8 +380,15 @@ document.addEventListener('click',e=>{
     $('invValore').value=''; $('invVers').value=i.versato?String(i.versato).replace('.',','):''; openSheet('sheetInv'); return; }
   if(e.target.closest('[data-close]')) closeSheets();
 });
-$('detDel').onclick=async()=>{ if(!detMov) return; closeSheets();
-  try{ await api('deleteMovimento',{},{id:detMov.id}); toast('Eliminato'); load(); renderMov(); }catch(e){ toast('Errore: '+e.message); } };
+function editBody(){ const b={id:detMov.id,fp:detMov.fp,categoria:$('eCat').value,descrizione:$('eDesc').value.trim(),importo:parseNum($('eImp').value)};
+  if($('eData').value) b.data=$('eData').value; return b; }
+async function afterWrite(msg){ toast(msg); await load(); if($('v-mov').classList.contains('on')) renderMov(); }
+$('detSave').onclick=async()=>{ if(!detMov) return; const b=editBody(); closeSheets();
+  try{ await api('updateMovimento',{},b); afterWrite('Modificato ✓'); }catch(e){ toast('Errore: '+e.message); } };
+$('detConf').onclick=async()=>{ if(!detMov) return; const b=editBody(); closeSheets();
+  try{ await api('confermaMovimento',{},b); afterWrite('Confermato ✓'); }catch(e){ toast('Errore: '+e.message); } };
+$('detDel').onclick=async()=>{ if(!detMov) return; if(!confirm('Eliminare questo movimento anche dal foglio?')) return; closeSheets();
+  try{ await api('deleteMovimento',{},{id:detMov.id,fp:detMov.fp}); afterWrite('Eliminato'); }catch(e){ toast('Errore: '+e.message); } };
 $('invSave').onclick=async()=>{
   const body={nome:$('invNome').textContent};
   if($('invPrezzo').value) body.prezzo=parseNum($('invPrezzo').value);
