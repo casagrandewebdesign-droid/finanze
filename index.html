@@ -302,7 +302,7 @@ function movRows(list){
   return (list||[]).map(m=>`<div class="it" data-mov='${esc(JSON.stringify(m))}'>
     <div class="ic">${icon(m.categoria)}</div>
     <div class="mid"><div class="t">${esc(m.descrizione||m.categoria||'Movimento')}${/VERIFICARE/.test(m.fonte||'')?'<span class="flag">da verificare</span>':''}</div>
-    <div class="s">${esc(m.categoria||'Senza categoria')} · ${new Date(m.data+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</div></div>
+    <div class="s">${esc(m.categoria||'Senza categoria')} · ${m.senzaData?'nel mese':new Date(m.data+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short'})}</div></div>
     <div class="a num ${m.importo>=0?'pos':''}">${m.importo>=0?'+':''}${eur(m.importo)}</div></div>`).join('');
 }
 
@@ -363,9 +363,10 @@ document.addEventListener('click',e=>{
     <div class="num" style="font-size:34px;font-weight:700" >${eur(detMov.importo)}</div><div style="color:var(--muted)">${esc(detMov.descrizione||'')}</div></div>
     <div class="card list">
       <div class="it"><div class="mid s">Categoria</div><div>${esc(detMov.categoria||'—')}</div></div>
-      <div class="it"><div class="mid s">Data</div><div>${new Date(detMov.data+'T12:00').toLocaleDateString('it-IT')}</div></div>
+      <div class="it"><div class="mid s">Data</div><div>${detMov.senzaData?new Date(detMov.data+'T12:00').toLocaleDateString('it-IT',{month:'long',year:'numeric'}):new Date(detMov.data+'T12:00').toLocaleDateString('it-IT')}</div></div>
       <div class="it"><div class="mid s">Conto</div><div>${esc(detMov.conto||'—')}</div></div>
       <div class="it"><div class="mid s">Fonte</div><div><span class="pill">${esc(detMov.fonte||'—')}</span></div></div></div>`;
+    $('detDel').style.display = detMov.soloLettura ? 'none' : '';
     openSheet('sheetDet'); return; }
   const inv=e.target.closest('[data-inv]');
   if(inv){ const i=JSON.parse(inv.dataset.inv); $('invNome').textContent=i.nome;
