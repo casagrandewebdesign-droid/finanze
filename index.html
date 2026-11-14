@@ -108,6 +108,16 @@ nav button.on{color:var(--brand)}
 .comp i{display:block;height:100%}
 .legend{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
 .legend b{color:var(--ink)}
+.alloc .legend{gap:8px}
+.alloc .row{display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.alloc .row b{font-variant-numeric:tabular-nums}
+.alloc .note{font-size:12px;color:var(--muted);margin-top:10px}
+.alloc .chips{margin-top:4px}
+.alloc .chip{font-size:13px;padding:5px 10px}
+.mix{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.mix .field{margin-top:0;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0}
+.mix .field label{width:auto;font-size:11px;padding-top:6px}
+.mix .field input{padding:4px 0 8px;width:100%}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 nav button{padding:4px 4px}
 </style>
@@ -190,8 +200,17 @@ nav button{padding:4px 4px}
     <div class="lbl">Valore totale</div>
     <div class="big num" id="iTot" style="margin-bottom:0">—</div>
   </div>
+  <h2>Ripartizione</h2>
+  <div class="card alloc">
+    <div class="comp" id="aBar"></div>
+    <div class="legend" id="aLeg"></div>
+    <div class="note" id="aNote"></div>
+    <div class="note" style="margin-top:12px">Liquidità da includere (conti broker / di investimento):</div>
+    <div class="chips" id="aConti"></div>
+  </div>
+  <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
-  <p class="sync">Tocca un investimento per aggiornare prezzo o valore.</p>
+  <p class="sync">Tocca un investimento per aggiornare prezzo, valore o tipo.</p>
 </section>
 
 <!-- IMPOSTAZIONI -->
@@ -262,6 +281,15 @@ nav button{padding:4px 4px}
     <div class="field"><label>Quote</label><input id="invQuote" inputmode="decimal"></div>
     <div class="field"><label>Valore</label><input id="invValore" inputmode="decimal" placeholder="se non hai il prezzo quota"></div>
     <div class="field"><label>Versato</label><input id="invVers" inputmode="decimal" placeholder="per calcolare il rendimento"></div>
+    <h2 style="margin-top:16px">Tipo di titolo</h2>
+    <div class="chips" id="invTipo">
+      <button class="chip" data-t="az">Azioni</button><button class="chip" data-t="ob">Obbligazioni</button><button class="chip" data-t="lq">Liquidità</button><button class="chip" data-t="mix">Misto</button>
+    </div>
+    <div class="mix" id="invMix" hidden>
+      <div class="field"><label>% Azioni</label><input id="mAz" inputmode="decimal"></div>
+      <div class="field"><label>% Obblig.</label><input id="mOb" inputmode="decimal"></div>
+      <div class="field"><label>% Liquidità</label><input id="mLq" inputmode="decimal"></div>
+    </div>
     <button class="btn" id="invSave">Aggiorna</button>
   </div>
 </div>
@@ -384,8 +412,61 @@ function renderInv(){
   $('iTot').textContent=cap(d.investimentiTotale);
   $('invList').innerHTML = d.investimenti.map(i=>`<div class="it" data-inv='${esc(JSON.stringify(i))}'>
     <div class="ic">📈</div>
-    <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · agg. ${i.aggiornato?new Date(i.aggiornato+'T12:00').toLocaleDateString('it-IT'):'—'}</div></div>
+    <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${(c=>c?esc(compLbl(c))+(c.stima?' (stima)':''):'<span class="flag">da classificare</span>')(compOf(i))} · ${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · agg. ${i.aggiornato?new Date(i.aggiornato+'T12:00').toLocaleDateString('it-IT'):'—'}</div></div>
     <div class="a num">${cap(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${nf(i.rendimento,2)}%</small>`:''}</div></div>`).join('') || '<div class="empty">Nessun investimento</div>';
+  renderAlloc();
+}
+
+/* ================== Ripartizione azioni / obbligazioni / liquidità ==================
+   La classificazione è salvata sul telefono (il motore non ha ancora questo campo). */
+const CLS=[['az','Azioni','var(--brand)'],['ob','Obbligazioni','var(--accent)'],['lq','Liquidità','#7d9bbd']];
+S.alloc = LS.get('alloc',{}); S.allocConti = LS.get('allocConti',null);
+// ipotesi automatica dal nome, finché non la confermi tu
+function guessComp(nome){
+  const n=String(nome||'').toLowerCase();
+  if(/monetar|money market|liquidit|conto deposito|deposit|salvadanaio|xeon|overnight|€str|estr/.test(n)) return {az:0,ob:0,lq:100,stima:true};
+  if(/bond|obblig|gov|treasury|btp|bot|cct|aggregate|corporate|duration|cedol|fixed income/.test(n)) return {az:0,ob:100,lq:0,stima:true};
+  if(/equilibri|bilanciat|balanced|moderat|multi.?asset|flessibil|prudent|mix/.test(n)) return {az:50,ob:50,lq:0,stima:true};
+  if(/azion|equity|stock|msci|s&p|ftse|nasdaq|world|etf/.test(n)) return {az:100,ob:0,lq:0,stima:true};
+  return null;
+}
+const compOf = i => S.alloc[i.nome] || guessComp(i.nome);
+const compLbl = c => !c ? 'da classificare' : c.az===100?'Azioni':c.ob===100?'Obbligazioni':c.lq===100?'Liquidità':`Misto ${nf(c.az,0)}/${nf(c.ob,0)}/${nf(c.lq,0)}`;
+const brokerConti = d => S.allocConti || d.conti.filter(c=>/directa|broker|degiro|fineco|trade|scalable|banca sella|webank|deposito/i.test(c.nome)).map(c=>c.nome);
+function renderAlloc(){
+  const d=S.dash; if(!d) return;
+  const tot={az:0,ob:0,lq:0}; let nc=0, ncV=0, stime=0;
+  d.investimenti.forEach(i=>{ const c=compOf(i), v=+i.valore||0; if(!v) return;
+    if(!c){ nc++; ncV+=v; return; } if(c.stima) stime++;
+    tot.az+=v*c.az/100; tot.ob+=v*c.ob/100; tot.lq+=v*c.lq/100; });
+  const sel=brokerConti(d);
+  d.conti.forEach(c=>{ if(sel.includes(c.nome)) tot.lq+=Math.max(0,+c.saldo||0); });
+  const somma=tot.az+tot.ob+tot.lq;
+  $('aBar').innerHTML = somma ? CLS.map(([k,,col])=>`<i style="width:${tot[k]/somma*100}%;background:${col}"></i>`).join('') : '<i style="width:100%;background:var(--line)"></i>';
+  $('aLeg').innerHTML = CLS.map(([k,l,col])=>`<div class="row"><span><span class="dot" style="background:${col}"></span>${l}</span><b>${S.priv?'':eur0(tot[k])+' · '}${somma?nf(tot[k]/somma*100,1):'0'}%</b></div>`).join('');
+  const note=[];
+  if(nc) note.push(`${nc} titol${nc>1?'i':'o'} da classificare${S.priv?'':' ('+eur0(ncV)+')'}, esclus${nc>1?'i':'o'} dal calcolo.`);
+  if(stime) note.push(`${stime} ripartizion${stime>1?'i':'e'} stimat${stime>1?'e':'a'} dal nome: tocca il titolo per confermare o correggere.`);
+  $('aNote').textContent=note.join(' ');
+  $('aConti').innerHTML = d.conti.map(c=>`<button class="chip ${sel.includes(c.nome)?'on':''}" data-ac="${esc(c.nome)}">${esc(c.nome)}${S.priv?'':' · '+eur0(c.saldo)}</button>`).join('');
+}
+$('aConti').onclick=e=>{ const b=e.target.closest('[data-ac]'); if(!b||!S.dash) return;
+  const sel=[...brokerConti(S.dash)], n=b.dataset.ac, k=sel.indexOf(n);
+  if(k>=0) sel.splice(k,1); else sel.push(n);
+  S.allocConti=sel; LS.set('allocConti',sel); renderAlloc(); };
+
+/* tipo nel foglio di modifica investimento */
+let invTipo=null;
+function setTipo(t,c){ invTipo=t; [...$('invTipo').children].forEach(x=>x.classList.toggle('on',x.dataset.t===t));
+  $('invMix').hidden = t!=='mix';
+  if(t==='mix'){ c=c||{az:50,ob:50,lq:0}; $('mAz').value=nf(c.az,0); $('mOb').value=nf(c.ob,0); $('mLq').value=nf(c.lq,0); } }
+$('invTipo').onclick=e=>{ const b=e.target.closest('[data-t]'); if(b) setTipo(b.dataset.t); };
+function tipoDaComp(c){ if(!c) return null; return c.az===100?'az':c.ob===100?'ob':c.lq===100?'lq':'mix'; }
+function compDaForm(){
+  if(invTipo==='az') return {az:100,ob:0,lq:0}; if(invTipo==='ob') return {az:0,ob:100,lq:0}; if(invTipo==='lq') return {az:0,ob:0,lq:100};
+  if(invTipo==='mix'){ const a=parseNum($('mAz').value), o=parseNum($('mOb').value), l=parseNum($('mLq').value), t=a+o+l;
+    if(!t) return null; return {az:a/t*100,ob:o/t*100,lq:l/t*100}; }
+  return null;
 }
 
 function renderConti(){
@@ -437,7 +518,8 @@ document.addEventListener('click',e=>{
   const inv=e.target.closest('[data-inv]');
   if(inv){ const i=JSON.parse(inv.dataset.inv); $('invNome').textContent=i.nome;
     $('invPrezzo').value=i.prezzo?String(i.prezzo).replace('.',','):''; $('invQuote').value=i.quote?String(i.quote).replace('.',','):'';
-    $('invValore').value=''; $('invVers').value=i.versato?String(i.versato).replace('.',','):''; openSheet('sheetInv'); return; }
+    $('invValore').value=''; $('invVers').value=i.versato?String(i.versato).replace('.',','):'';
+    const c=compOf(i); setTipo(tipoDaComp(c),c); openSheet('sheetInv'); return; }
   if(e.target.closest('[data-close]')) closeSheets();
 });
 function editBody(){ const b={id:detMov.id,fp:detMov.fp,categoria:$('eCat').value,descrizione:$('eDesc').value.trim(),importo:parseNum($('eImp').value)};
@@ -455,7 +537,11 @@ $('invSave').onclick=async()=>{
   if($('invQuote').value) body.quote=parseNum($('invQuote').value);
   if($('invValore').value) body.valore=parseNum($('invValore').value);
   if($('invVers').value) body.versato=parseNum($('invVers').value);
-  closeSheets();
+  const comp=compDaForm();
+  if(invTipo==='mix' && !comp){ toast('Inserisci le percentuali'); return; }
+  if(comp){ S.alloc[body.nome]=comp; LS.set('alloc',S.alloc); }
+  closeSheets(); renderInv();
+  if(Object.keys(body).length===1){ toast('Tipo salvato ✓'); return; }
   try{ await api('updateInvestimento',{},body); toast('Aggiornato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
 };
 
