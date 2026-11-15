@@ -9,7 +9,7 @@
  *     nella colonna "Codice (ISIN/ticker)" (Yahoo Finance, poi Financial Times)
  *   - tab "Acquisti": ogni acquisto (anche le rate di un PAC) con data, importo,
  *     prezzo e quote → quote totali, versato, prezzo medio e rendimento annualizzato
- *   - colonna "Classe" (Misto az/ob/liq, es. "Misto 29,99/70,01/0")
+ *   - colonna "Classe" (Misto azioni/obbligazioni/monetario, es. "Misto 29,99/70,01/0")
  *   - colonna "Gruppo": "Previdenza" per i fondi pensione, tenuti separati dagli altri investimenti
  *   - l'app riceve tutte le colonne del foglio (campo "campi") e può scriverne di nuove (campo "campi"
  *     in updateInvestimento): le prossime funzioni non richiederanno di toccare di nuovo il motore
@@ -113,7 +113,7 @@ function parseClasse_(s) {
   if (!s) return null;
   if (/^az/.test(s)) return { az: 100, ob: 0, lq: 0 };
   if (/^ob/.test(s)) return { az: 0, ob: 100, lq: 0 };
-  if (/^li/.test(s)) return { az: 0, ob: 0, lq: 100 };
+  if (/^(li|mo)/.test(s)) return { az: 0, ob: 0, lq: 100 };
   const m = s.match(/(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)\D+(\d+(?:[.,]\d+)?)/);
   if (m) {
     const a = num_(m[1]), o = num_(m[2]), l = num_(m[3]), t = a + o + l;
@@ -125,7 +125,7 @@ function fmtClasse_(c) {
   if (!c) return '';
   if (c.az >= 99.99) return 'Azioni';
   if (c.ob >= 99.99) return 'Obbligazioni';
-  if (c.lq >= 99.99) return 'Liquidità';
+  if (c.lq >= 99.99) return 'Monetario';
   return 'Misto ' + [c.az, c.ob, c.lq].map(x => String(Math.round(x * 100) / 100).replace('.', ',')).join('/');
 }
 

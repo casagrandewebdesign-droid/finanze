@@ -242,15 +242,13 @@ h1{padding-right:52px}
     <div class="comp" id="aBar"></div>
     <div class="legend" id="aLeg"></div>
     <div class="note" id="aNote"></div>
-    <div class="note" style="margin-top:12px">Liquidità da includere (conti broker / di investimento):</div>
-    <div class="chips" id="aConti"></div>
   </div>
   <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
   <div id="prevBox" hidden>
-    <h2>Previdenza</h2>
+    <h2>Fondo pensione <span id="prevTot" style="float:right;text-transform:none;letter-spacing:0"></span></h2>
     <div class="card list inv" id="prevList"></div>
-    <p class="sync" style="margin-top:8px">Il fondo pensione è escluso dal totale e dalla ripartizione qui sopra.</p>
+    <p class="sync" style="margin-top:8px">Tenuto separato: non rientra nel totale né nella ripartizione dei titoli.</p>
   </div>
   <p class="sync">Tocca un investimento per vedere gli acquisti, cambiare ISIN, tipo o valori.</p>
 </section>
@@ -364,14 +362,13 @@ h1{padding-right:52px}
     <div class="field"><label>Versato</label><input id="invVers" inputmode="decimal" placeholder="per calcolare il rendimento"></div>
     <h2 style="margin-top:16px">Tipo di titolo</h2>
     <div class="chips" id="invTipo">
-      <button class="chip" data-t="az">Azioni</button><button class="chip" data-t="ob">Obbligazioni</button><button class="chip" data-t="lq">Liquidità</button><button class="chip" data-t="mix">Misto</button>
+      <button class="chip" data-t="az">Azioni</button><button class="chip" data-t="ob">Obbligazioni</button><button class="chip" data-t="lq">Monetario</button><button class="chip" data-t="mix">Misto</button>
     </div>
     <div class="mix" id="invMix" hidden>
       <div class="field"><label>% Azioni</label><input id="mAz" inputmode="decimal"></div>
       <div class="field"><label>% Obblig.</label><input id="mOb" inputmode="decimal"></div>
-      <div class="field"><label>% Liquidità</label><input id="mLq" inputmode="decimal"></div>
+      <div class="field"><label>% Monetario</label><input id="mLq" inputmode="decimal"></div>
     </div>
-    <div class="chips" style="margin-top:12px"><button class="chip" id="invPrev">🏛️ Fondo pensione (tienilo separato)</button></div>
     <button class="btn" id="invSave">Aggiorna</button>
     <button class="btn danger" id="invDel">Elimina investimento</button>
   </div>
@@ -383,10 +380,10 @@ h1{padding-right:52px}
   <div class="sheet">
     <div class="grab"></div>
     <h2 style="margin-top:4px;text-transform:none;font-size:17px;color:var(--ink)">Nuovo investimento</h2>
+    <div class="seg" id="niGruppo" style="margin-bottom:6px"><button data-g="" class="on">Titolo</button><button data-g="Previdenza">Fondo pensione</button></div>
     <div class="field"><label>Nome</label><input id="niNome" placeholder="es. ETF MSCI World"></div>
     <div class="field"><label>ISIN / ticker</label><input id="niCod" autocapitalize="characters" placeholder="per il prezzo automatico"></div>
-    <div class="field"><label>Tipo</label><select id="niTipo"><option value="">da decidere</option><option value="az">Azioni</option><option value="ob">Obbligazioni</option><option value="lq">Liquidità</option><option value="mix">Misto 50/50</option></select></div>
-    <div class="field"><label>Gruppo</label><select id="niGruppo"><option value="">Investimento</option><option value="Previdenza">Fondo pensione</option></select></div>
+    <div class="field"><label>Tipo</label><select id="niTipo"><option value="">da decidere</option><option value="az">Azioni</option><option value="ob">Obbligazioni</option><option value="lq">Monetario</option><option value="mix">Misto 50/50</option></select></div>
     <div class="minihead">Primo acquisto (facoltativo)</div>
     <div class="field"><label>Data</label><input id="niData" type="date"></div>
     <div class="field"><label>Importo €</label><input id="niImp" inputmode="decimal" placeholder="es. 1000"></div>
@@ -670,7 +667,7 @@ function renderInv(){
     <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${(c=>c?esc(compLbl(c))+(c.stima?' (stima)':''):'<span class="flag">da classificare</span>')(compOf(i))} · ${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · ${prezzoLbl(i)}</div></div>
     <div class="a num">${cap(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${nf(i.rendimento,2)}%</small>`:''}</div></div>`;
   $('invList').innerHTML = d.investimenti.filter(i=>!isPrev(i)).map(riga).join('') || '<div class="empty">Nessun investimento</div>';
-  const prev=d.investimenti.filter(isPrev); $('prevBox').hidden=!prev.length; $('prevList').innerHTML=prev.map(riga).join('');
+  const prev=d.investimenti.filter(isPrev); $('prevBox').hidden=!prev.length; $('prevTot').textContent=cap(pv); $('prevList').innerHTML=prev.map(riga).join('');
   renderAlloc();
 }
 
@@ -682,7 +679,7 @@ function prezzoLbl(i){
 }
 /* fondo pensione / previdenza: tenuto a parte */
 S.prev = LS.get('prev',{});
-const isPrev = i => /previdenz|pension/i.test(i.gruppo||'') || (!('gruppo' in i) && !!S.prev[i.nome]) || (i.gruppo==='' && !!S.prev[i.nome]);
+const isPrev = i => ('gruppo' in i) ? /previdenz|pension/i.test(i.gruppo||'') : !!S.prev[i.nome];
 const prevTot = d => (d.investimenti||[]).filter(isPrev).reduce((s,i)=>s+(+i.valore||0),0);
 const invByName = n => (S.dash&&S.dash.investimenti||[]).find(x=>x.nome===n);
 
@@ -722,10 +719,8 @@ function openInv(i){
   if(!i.pac) $('invVers').placeholder='per calcolare il rendimento';
   $('invDel').hidden = !v2 || !!i.pac;
   const c=compOf(i); setTipo(tipoDaComp(c),c);
-  $('invPrev').classList.toggle('on',isPrev(i));
   openSheet('sheetInv');
 }
-$('invPrev').onclick=()=>$('invPrev').classList.toggle('on');
 $('invAcqBtn').onclick=()=>{ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true; $('acqData').value=today();
   $('acqImp').value=''; $('acqQuote').value=''; $('acqPrezzo').value=invCur&&invCur.prezzo?String(invCur.prezzo).replace('.',','):''; setTimeout(()=>$('acqImp').focus(),100); };
 $('acqSave').onclick=async()=>{
@@ -753,7 +748,10 @@ $('btnPrezzi').onclick=async()=>{
 };
 
 /* nuovo investimento */
-$('btnNuovoInv').onclick=()=>{ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; $('niGruppo').value=''; $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); };
+$('btnNuovoInv').onclick=()=>{ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; setGruppo(''); $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); };
+let niGruppo='';
+function setGruppo(g){ niGruppo=g; [...$('niGruppo').children].forEach(b=>b.classList.toggle('on',b.dataset.g===g)); }
+$('niGruppo').onclick=e=>{ const b=e.target.closest('button'); if(b) setGruppo(b.dataset.g); };
 $('niSave').onclick=async()=>{
   const nome=$('niNome').value.trim(); if(!nome){ toast('Dai un nome'); return; }
   const t=$('niTipo').value, classe={az:{az:100,ob:0,lq:0},ob:{az:0,ob:100,lq:0},lq:{az:0,ob:0,lq:100},mix:{az:50,ob:50,lq:0}}[t];
@@ -761,7 +759,7 @@ $('niSave').onclick=async()=>{
   if(imp && !pr && !$('niCod').value.trim()){ toast('Per il primo acquisto serve il prezzo'); return; }
   closeSheets(); toast('Creo…');
   try{
-    const gruppo=$('niGruppo').value; await api('addInvestimento',{},{nome,codice:$('niCod').value.trim(),classe,gruppo});
+    const gruppo=niGruppo; await api('addInvestimento',{},{nome,codice:$('niCod').value.trim(),classe,gruppo});
     if(gruppo){ S.prev[nome]=true; LS.set('prev',S.prev); }
     if(classe){ S.alloc[nome]=classe; LS.set('alloc',S.alloc); }
     if(imp){ await api('addAcquisto',{},{nome,data:$('niData').value||today(),importo:imp,prezzo:pr||undefined}); }
@@ -772,8 +770,6 @@ $('niSave').onclick=async()=>{
 /* le classi scelte sul telefono passano nel foglio quando il motore le supporta */
 function migraClassi(){
   const d=S.dash; if(!d||!d._v2||DEMO()) return;
-  d.investimenti.filter(i=>i.gruppo==='' && S.prev[i.nome] && !LS.get('prevMigr_'+i.nome,false)).forEach(i=>{
-    LS.set('prevMigr_'+i.nome,true); api('updateInvestimento',{},{nome:i.nome,gruppo:'Previdenza'}).catch(()=>{}); });
   if(LS.get('classiMigrate',false)) return;
   const da=d.investimenti.filter(i=>!i.classe && S.alloc[i.nome]);
   LS.set('classiMigrate',true);
@@ -782,8 +778,8 @@ function migraClassi(){
 
 /* ================== Ripartizione azioni / obbligazioni / liquidità ==================
    Con il motore aggiornato la classificazione sta nel foglio (colonna Classe); altrimenti sul telefono. */
-const CLS=[['az','Azioni','var(--brand)'],['ob','Obbligazioni','var(--accent)'],['lq','Liquidità','#7d9bbd']];
-S.alloc = LS.get('alloc',{}); S.allocConti = LS.get('allocConti',null);
+const CLS=[['az','Azioni','var(--brand)'],['ob','Obbligazioni','var(--accent)'],['lq','Monetario','#7d9bbd']];
+S.alloc = LS.get('alloc',{});
 // ipotesi automatica dal nome, finché non la confermi tu
 function guessComp(nome){
   const n=String(nome||'').toLowerCase();
@@ -794,16 +790,13 @@ function guessComp(nome){
   return null;
 }
 const compOf = i => (S.dash&&S.dash._v2&&i.classe) || S.alloc[i.nome] || i.classe || guessComp(i.nome);
-const compLbl = c => !c ? 'da classificare' : c.az>=99.99?'Azioni':c.ob>=99.99?'Obbligazioni':c.lq>=99.99?'Liquidità':[['az','Az.'],['ob','Obbl.'],['lq','Liq.']].filter(([k])=>c[k]>=0.5).map(([k,l])=>l+' '+nf(c[k],0)+'%').join(' · ');
-const brokerConti = d => S.allocConti || d.conti.filter(c=>/directa|broker|degiro|fineco|trade|scalable|banca sella|webank|deposito/i.test(c.nome)).map(c=>c.nome);
+const compLbl = c => !c ? 'da classificare' : c.az>=99.99?'Azioni':c.ob>=99.99?'Obbligazioni':c.lq>=99.99?'Monetario':[['az','Az.'],['ob','Obbl.'],['lq','Mon.']].filter(([k])=>c[k]>=0.5).map(([k,l])=>l+' '+nf(c[k],0)+'%').join(' · ');
 function renderAlloc(){
   const d=S.dash; if(!d) return;
   const tot={az:0,ob:0,lq:0}; let nc=0, ncV=0, stime=0;
   d.investimenti.filter(i=>!isPrev(i)).forEach(i=>{ const c=compOf(i), v=+i.valore||0; if(!v) return;
     if(!c){ nc++; ncV+=v; return; } if(c.stima) stime++;
     tot.az+=v*c.az/100; tot.ob+=v*c.ob/100; tot.lq+=v*c.lq/100; });
-  const sel=brokerConti(d);
-  d.conti.forEach(c=>{ if(sel.includes(c.nome)) tot.lq+=Math.max(0,+c.saldo||0); });
   const somma=tot.az+tot.ob+tot.lq;
   $('aBar').innerHTML = somma ? CLS.map(([k,,col])=>`<i style="width:${tot[k]/somma*100}%;background:${col}"></i>`).join('') : '<i style="width:100%;background:var(--line)"></i>';
   $('aLeg').innerHTML = CLS.map(([k,l,col])=>`<div class="row"><span><span class="dot" style="background:${col}"></span>${l}</span><b>${S.priv?'':eur0(tot[k])+' · '}${somma?nf(tot[k]/somma*100,1):'0'}%</b></div>`).join('');
@@ -811,12 +804,7 @@ function renderAlloc(){
   if(nc) note.push(`${nc} titol${nc>1?'i':'o'} da classificare${S.priv?'':' ('+eur0(ncV)+')'}, esclus${nc>1?'i':'o'} dal calcolo.`);
   if(stime) note.push(`${stime} ripartizion${stime>1?'i':'e'} stimat${stime>1?'e':'a'} dal nome: tocca il titolo per confermare o correggere.`);
   $('aNote').textContent=note.join(' ');
-  $('aConti').innerHTML = d.conti.map(c=>`<button class="chip ${sel.includes(c.nome)?'on':''}" data-ac="${esc(c.nome)}">${esc(c.nome)}${S.priv?'':' · '+eur0(c.saldo)}</button>`).join('');
 }
-$('aConti').onclick=e=>{ const b=e.target.closest('[data-ac]'); if(!b||!S.dash) return;
-  const sel=[...brokerConti(S.dash)], n=b.dataset.ac, k=sel.indexOf(n);
-  if(k>=0) sel.splice(k,1); else sel.push(n);
-  S.allocConti=sel; LS.set('allocConti',sel); renderAlloc(); };
 
 /* tipo nel foglio di modifica investimento */
 let invTipo=null;
@@ -901,8 +889,6 @@ $('invSave').onclick=async()=>{
   const comp=compDaForm();
   if(invTipo==='mix' && !comp){ toast('Inserisci le percentuali'); return; }
   if(comp){ S.alloc[i.nome]=comp; LS.set('alloc',S.alloc); if(v2) body.classe=comp; }
-  const prevOn=$('invPrev').classList.contains('on');
-  if(prevOn!==isPrev(i)){ S.prev[i.nome]=prevOn; LS.set('prev',S.prev); if(v2) body.gruppo=prevOn?'Previdenza':''; }
   const cod=$('invCod').value.trim().toUpperCase(), codNuovo = v2 && cod!==(i.codice||'');
   if(codNuovo) body.codice=cod;
   closeSheets(); renderInv();
