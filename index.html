@@ -75,6 +75,12 @@ nav button.on{color:var(--brand)}
 .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-radius:24px 24px 0 0;padding:10px 16px calc(var(--safe-b) + 16px);transform:translateY(105%);transition:transform .28s cubic-bezier(.2,.8,.2,1);z-index:11;max-height:92vh;overflow:auto}
 .open .sheet-bg{opacity:1;pointer-events:auto}.open .sheet{transform:none}
 .grab{width:40px;height:5px;border-radius:5px;background:var(--line);margin:0 auto 12px}
+.sheet-top{position:sticky;top:-10px;z-index:3;margin:-10px -16px 6px;padding:10px 16px 4px;min-height:46px;background:var(--bg);border-radius:24px 24px 0 0;display:flex;justify-content:center;touch-action:none}
+.sheet-top .grab{margin:0}
+.sheet-x{position:absolute;right:12px;top:10px;width:34px;height:34px;border-radius:50%;border:0;padding:0;background:var(--line);color:var(--ink);display:grid;place-items:center;cursor:pointer}
+.sheet-x svg{width:16px;height:16px}
+.sheet-x:active{transform:scale(.92)}
+.sheet.drag{transition:none}
 .seg{display:flex;background:var(--card);border-radius:14px;padding:4px;box-shadow:var(--shadow)}
 .seg button{flex:1;border:0;background:none;padding:9px;border-radius:10px;font-weight:600;color:var(--muted);font-size:15px}
 .seg button.on{background:var(--ink);color:var(--bg)}
@@ -166,21 +172,48 @@ h1{padding-right:52px}
 .tbl td{text-align:right;padding:8px 0 8px 5px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tbl td:first-child{white-space:normal;min-width:96px;font-size:12.5px}
 /* blocco Face ID */
-#lock{position:fixed;inset:0;z-index:9999;background:var(--brand);color:var(--brand-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
+#lock{position:fixed;inset:0;z-index:9999;color:#fff;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:space-between;
+  padding:calc(var(--safe-t) + 56px) 28px calc(var(--safe-b) + 34px);
+  background:radial-gradient(120% 70% at 85% -10%,#3f7f58 0,transparent 55%),radial-gradient(90% 60% at 0% 110%,#0f5c46 0,transparent 60%),linear-gradient(170deg,#0d3a2d 0%,#0a2219 100%)}
 #lock[hidden]{display:none}
-#lock .ic{width:84px;height:84px;border-radius:26px;background:rgba(255,255,255,.14);display:grid;place-items:center}
-#lock .t{font-size:22px;font-weight:700;letter-spacing:-.01em}
-#lock button{border:0;border-radius:14px;padding:14px 26px;font:600 17px -apple-system,sans-serif;background:var(--accent);color:#15211d}
-#lock .err{font-size:13px;opacity:.8;min-height:18px;text-align:center}
+#lock .top{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px}
+#lock .logo{width:76px;height:76px;border-radius:20px;box-shadow:0 10px 30px rgba(0,0,0,.35);margin-bottom:14px}
+#lock .t{font-size:30px;font-weight:700;letter-spacing:-.02em}
+#lock .d{font-size:15px;opacity:.65;text-transform:capitalize}
+#lock .mid{display:flex;flex-direction:column;align-items:center;gap:16px;background:none;border:0;color:inherit;padding:0;font:inherit;cursor:pointer}
+#lock .scan{position:relative;width:96px;height:96px;color:var(--accent)}
+#lock .scan svg{width:100%;height:100%;display:block}
+#lock .scan::after{content:"";position:absolute;left:14%;right:14%;height:2px;border-radius:2px;background:var(--accent);box-shadow:0 0 12px var(--accent);top:12%;opacity:0}
+#lock.busy .scan::after{animation:scan 1.4s ease-in-out infinite}
+#lock.busy .scan svg{animation:breathe 1.4s ease-in-out infinite}
+#lock .st{font-size:15px;opacity:.8;min-height:20px;text-align:center}
+#lock.ko .st{color:#ffb4a6;opacity:1}
+#lock.ko .scan{animation:shake .4s}
+#lock .bot{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;gap:12px}
+#lock .bot button{width:100%;border:0;border-radius:16px;padding:16px;font:650 17px -apple-system,sans-serif;background:var(--accent);color:#13221c;display:flex;align-items:center;justify-content:center;gap:10px}
+#lock .bot button:active{transform:scale(.98)}
+#lock .bot small{font-size:12px;opacity:.5;display:flex;align-items:center;gap:6px}
+@keyframes scan{0%{top:12%;opacity:0}15%{opacity:1}85%{opacity:1}100%{top:86%;opacity:0}}
+@keyframes breathe{50%{opacity:.55}}
+@keyframes shake{20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}}
 </style>
 </head>
 <body>
 
 <div id="lock" hidden>
-  <div class="ic"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
-  <div class="t">Finanze è bloccata</div>
-  <button id="lockBtn">Sblocca con Face ID</button>
-  <div class="err" id="lockErr"></div>
+  <div class="top">
+    <img class="logo" src="icon-180.png" alt="">
+    <div class="t">Ciao Federico</div>
+    <div class="d" id="lockData"></div>
+  </div>
+  <button class="mid" id="lockTap" aria-label="Sblocca con Face ID">
+    <div class="scan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2"/><path d="M8.5 9v1.2M15.5 9v1.2M12 9v4.2h-1"/><path d="M8.8 16.2c1.9 1.4 4.5 1.4 6.4 0"/></svg></div>
+    <div class="st" id="lockErr">Tocca per sbloccare</div>
+  </button>
+  <div class="bot">
+    <button id="lockBtn"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2"/><path d="M8.5 9v1.2M15.5 9v1.2M12 9v4.2h-1"/><path d="M8.8 16.2c1.9 1.4 4.5 1.4 6.4 0"/></svg>Sblocca con Face ID</button>
+    <small><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Finanze · i tuoi dati restano sul tuo motore</small>
+  </div>
 </div>
 
 <div id="demoBanner" class="demo" hidden>Modalità demo: dati di esempio. Collega il tuo motore da <b>Impostazioni</b>.</div>
@@ -975,7 +1008,19 @@ function fillForm(){
   sel.innerHTML=c.conti.map(x=>`<option>${esc(x.nome)}</option>`).join(''); if(prev) sel.value=prev;
 }
 function openSheet(id){ $(id).classList.add('open'); }
-function closeSheets(){ document.querySelectorAll('.open').forEach(e=>e.classList.remove('open')); }
+function closeSheets(){ document.querySelectorAll('.open').forEach(e=>e.classList.remove('open')); document.querySelectorAll('.sheet').forEach(sh=>sh.style.transform=''); }
+// ogni scheda: barra in alto sempre visibile con X di chiusura; si chiude anche trascinandola verso il basso
+document.querySelectorAll('.sheet').forEach(sh=>{
+  const g=sh.querySelector('.grab'); const top=document.createElement('div'); top.className='sheet-top';
+  top.innerHTML='<div class="grab"></div><button class="sheet-x" data-close aria-label="Chiudi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>';
+  if(g) g.replaceWith(top); else sh.prepend(top);
+  let y0=null, dy=0;
+  top.addEventListener('touchstart',e=>{ if(e.target.closest('.sheet-x')) return; y0=e.touches[0].clientY; dy=0; sh.classList.add('drag'); },{passive:true});
+  top.addEventListener('touchmove',e=>{ if(y0==null) return; dy=Math.max(0,e.touches[0].clientY-y0); sh.style.transform='translateY('+dy+'px)'; },{passive:true});
+  top.addEventListener('touchend',()=>{ if(y0==null) return; y0=null; sh.classList.remove('drag'); if(dy>90) closeSheets(); else sh.style.transform=''; });
+});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSheets(); });
+{ const ed=$('stoEdit'), t=ed&&ed.closest('.sheet').querySelector('.sheet-top'); if(t){ ed.removeAttribute('style'); ed.className='sheet-x'; ed.style.left='12px'; ed.style.right='auto'; ed.querySelector('svg').setAttribute('stroke-width','2.4'); t.appendChild(ed); } }
 
 $('fab').onclick=()=>{ if($('v-inv').classList.contains('on')){ nuovoInv(); return; } $('aImp').value=''; $('aDesc').value=''; $('aData').value=today(); S.cat=''; fillForm(); openSheet('sheetAdd'); setTimeout(()=>$('aImp').focus(),250); };
 $('segTipo').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; S.segno=b.dataset.s; [...$('segTipo').children].forEach(x=>x.classList.toggle('on',x===b)); fillForm(); };
@@ -1207,7 +1252,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='13 · 15/11 03:30';
+const VERSIONE='14 · 15/11 22:30';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
@@ -1229,12 +1274,17 @@ const FID = (() => {
     await navigator.credentials.get({publicKey:{challenge:rnd(32),userVerification:'required',timeout:60000,
       allowCredentials:[{type:'public-key',id:fromB64(cred())}]}});
   }
+  let inCorso=false;
+  const stato=(cls,txt)=>{ const L=$('lock'); L.classList.remove('busy','ko'); if(cls){ void L.offsetWidth; L.classList.add(cls); } $('lockErr').textContent=txt; };
   async function sblocca(auto){
-    $('lockErr').textContent='';
-    try{ await verifica(); $('lock').hidden=true; }
-    catch(e){ if(!auto) $('lockErr').textContent='Non riconosciuto, riprova.'; }
+    if(inCorso) return; inCorso=true;
+    stato('busy','Riconoscimento in corso…');
+    try{ await verifica(); $('lock').hidden=true; stato('',''); }
+    catch(e){ stato(auto?'':'ko', auto?'Tocca per sbloccare':'Non riconosciuto, riprova'); }
+    inCorso=false;
   }
-  function blocca(){ if(cred()) $('lock').hidden=false; }
+  function mostra(){ $('lockData').textContent=new Date().toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'}); stato('','Tocca per sbloccare'); $('lock').hidden=false; }
+  function blocca(){ if(cred()) mostra(); }
   async function attiva(){
     const c=await navigator.credentials.create({publicKey:{challenge:rnd(32),rp:{name:'Finanze'},
       user:{id:rnd(16),name:'federico',displayName:'Federico'},
@@ -1256,10 +1306,10 @@ const FID = (() => {
     }catch(e){ toast('Operazione annullata'); }
     paint();
   };
-  $('lockBtn').onclick=()=>sblocca(false);
+  $('lockBtn').onclick=$('lockTap').onclick=()=>sblocca(false);
   document.addEventListener('visibilitychange',()=>{
     if(!cred()) return;
-    if(document.hidden){ uscita=Date.now(); $('lock').hidden=false; }   // copre anche l'anteprima nel multitasking
+    if(document.hidden){ uscita=Date.now(); mostra(); }   // copre anche l'anteprima nel multitasking
     else if(Date.now()-uscita<GRAZIA) $('lock').hidden=true;
     else sblocca(true);
   });
