@@ -36,6 +36,7 @@ h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute
 .hero .big{font-size:36px;font-weight:700;letter-spacing:-.02em;margin:2px 0 12px}
 .hero .row{display:flex;gap:18px;font-size:14px}
 .hero .row b{display:block;font-size:17px}
+.hero.tre .row{gap:12px}.hero.tre .row b{font-size:15px}
 .eye{position:absolute;top:14px;right:14px;z-index:1;width:38px;height:38px;border-radius:12px;border:0;background:rgba(255,255,255,.16);color:var(--brand-ink);display:grid;place-items:center}
 .eye svg{width:20px;height:20px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
@@ -174,6 +175,7 @@ h1{padding-right:52px}
     <div class="row">
       <div><span class="lbl">Liquidità</span><b class="num" id="hLiq">—</b></div>
       <div><span class="lbl">Investimenti</span><b class="num" id="hInv">—</b></div>
+      <div id="hPrevBox" hidden><span class="lbl">Previdenza</span><b class="num" id="hPrev">—</b></div>
     </div>
   </div>
   <div class="grid3">
@@ -217,8 +219,8 @@ h1{padding-right:52px}
   </div>
   <h2>Composizione</h2>
   <div class="card">
-    <div class="comp"><i id="cLiq" style="background:var(--brand)"></i><i id="cInv" style="background:var(--accent)"></i></div>
-    <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>Liquidità <b id="cLiqV">—</b></span><span><span class="dot" style="background:var(--accent)"></span>Investimenti <b id="cInvV">—</b></span></div>
+    <div class="comp"><i id="cLiq" style="background:var(--brand)"></i><i id="cInv" style="background:var(--accent)"></i><i id="cPrev" style="background:#b08d57"></i></div>
+    <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>Liquidità <b id="cLiqV">—</b></span><span><span class="dot" style="background:var(--accent)"></span>Investimenti <b id="cInvV">—</b></span><span id="cPrevRow" hidden><span class="dot" style="background:#b08d57"></span>Previdenza <b id="cPrevV">—</b></span></div>
   </div>
   <h2>Mese per mese</h2>
   <div class="card list" id="pList"></div>
@@ -228,7 +230,7 @@ h1{padding-right:52px}
 <section class="view" id="v-inv">
   <h1>Investimenti</h1>
   <div class="hero" style="margin-bottom:12px">
-    <div class="lbl">Valore totale</div>
+    <div class="lbl" id="iTotLbl">Valore totale</div>
     <div class="big num" id="iTot" style="margin-bottom:0">—</div>
   </div>
   <div class="invbar" id="invBar">
@@ -245,6 +247,11 @@ h1{padding-right:52px}
   </div>
   <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
+  <div id="prevBox" hidden>
+    <h2>Previdenza</h2>
+    <div class="card list inv" id="prevList"></div>
+    <p class="sync" style="margin-top:8px">Il fondo pensione è escluso dal totale e dalla ripartizione qui sopra.</p>
+  </div>
   <p class="sync">Tocca un investimento per vedere gli acquisti, cambiare ISIN, tipo o valori.</p>
 </section>
 
@@ -364,6 +371,7 @@ h1{padding-right:52px}
       <div class="field"><label>% Obblig.</label><input id="mOb" inputmode="decimal"></div>
       <div class="field"><label>% Liquidità</label><input id="mLq" inputmode="decimal"></div>
     </div>
+    <div class="chips" style="margin-top:12px"><button class="chip" id="invPrev">🏛️ Fondo pensione (tienilo separato)</button></div>
     <button class="btn" id="invSave">Aggiorna</button>
     <button class="btn danger" id="invDel">Elimina investimento</button>
   </div>
@@ -378,6 +386,7 @@ h1{padding-right:52px}
     <div class="field"><label>Nome</label><input id="niNome" placeholder="es. ETF MSCI World"></div>
     <div class="field"><label>ISIN / ticker</label><input id="niCod" autocapitalize="characters" placeholder="per il prezzo automatico"></div>
     <div class="field"><label>Tipo</label><select id="niTipo"><option value="">da decidere</option><option value="az">Azioni</option><option value="ob">Obbligazioni</option><option value="lq">Liquidità</option><option value="mix">Misto 50/50</option></select></div>
+    <div class="field"><label>Gruppo</label><select id="niGruppo"><option value="">Investimento</option><option value="Previdenza">Fondo pensione</option></select></div>
     <div class="minihead">Primo acquisto (facoltativo)</div>
     <div class="field"><label>Data</label><input id="niData" type="date"></div>
     <div class="field"><label>Importo €</label><input id="niImp" inputmode="decimal" placeholder="es. 1000"></div>
@@ -467,7 +476,7 @@ async function load(){
 /* ================== Render ================== */
 function renderHome(){
   const d=S.dash; if(!d) return;
-  $('hPatr').textContent=cap(d.patrimonio); $('hLiq').textContent=cap(d.liquidita); $('hInv').textContent=cap(d.investimentiTotale);
+  $('hPatr').textContent=cap(d.patrimonio); $('hLiq').textContent=cap(d.liquidita); const pv=prevTot(d); $('hInv').textContent=cap(d.investimentiTotale-pv); $('hPrevBox').hidden=!pv; $('hPrev').textContent=cap(pv); $('hPatr').closest('.hero').classList.toggle('tre',!!pv);
   $('sEnt').textContent=eur(d.entrate); $('sUsc').textContent=eur(d.uscite);
   $('sRis').textContent = d.tassoRisparmio==null?'—':Math.round(d.tassoRisparmio)+'%';
   renderCatHome();
@@ -649,15 +658,19 @@ async function renderMov(){
 
 function renderInv(){
   const d=S.dash; if(!d) return;
-  $('iTot').textContent=cap(d.investimentiTotale);
+  const pv=prevTot(d);
+  $('iTot').textContent=cap(d.investimentiTotale-pv);
+  $('iTotLbl').textContent = pv ? 'Valore totale (escluso fondo pensione)' : 'Valore totale';
   const v2=!!d._v2;
   $('invBar').style.display = v2 ? '' : 'none';
   $('prezziInfo').textContent = v2 ? '' : (DEMO()?'':'Prezzi automatici e PAC: aggiorna il motore con il file Prezzi.gs');
   migraClassi();
-  $('invList').innerHTML = d.investimenti.map(i=>`<div class="it" data-inv="${esc(i.nome)}">
-    <div class="ic">${i.pac?'🔁':'📈'}</div>
+  const riga=i=>`<div class="it" data-inv="${esc(i.nome)}">
+    <div class="ic">${isPrev(i)?'🏛️':i.pac?'🔁':'📈'}</div>
     <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${(c=>c?esc(compLbl(c))+(c.stima?' (stima)':''):'<span class="flag">da classificare</span>')(compOf(i))} · ${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · ${prezzoLbl(i)}</div></div>
-    <div class="a num">${cap(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${nf(i.rendimento,2)}%</small>`:''}</div></div>`).join('') || '<div class="empty">Nessun investimento</div>';
+    <div class="a num">${cap(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${nf(i.rendimento,2)}%</small>`:''}</div></div>`;
+  $('invList').innerHTML = d.investimenti.filter(i=>!isPrev(i)).map(riga).join('') || '<div class="empty">Nessun investimento</div>';
+  const prev=d.investimenti.filter(isPrev); $('prevBox').hidden=!prev.length; $('prevList').innerHTML=prev.map(riga).join('');
   renderAlloc();
 }
 
@@ -667,6 +680,10 @@ function prezzoLbl(i){
   if(i.dataPrezzo) return 'prezzo del '+dIt(i.dataPrezzo)+(i.codice?'':' (manuale)');
   return 'agg. '+dIt(i.aggiornato);
 }
+/* fondo pensione / previdenza: tenuto a parte */
+S.prev = LS.get('prev',{});
+const isPrev = i => /previdenz|pension/i.test(i.gruppo||'') || (!('gruppo' in i) && !!S.prev[i.nome]) || (i.gruppo==='' && !!S.prev[i.nome]);
+const prevTot = d => (d.investimenti||[]).filter(isPrev).reduce((s,i)=>s+(+i.valore||0),0);
 const invByName = n => (S.dash&&S.dash.investimenti||[]).find(x=>x.nome===n);
 
 /* scheda investimento: riepilogo PAC / acquisti */
@@ -705,8 +722,10 @@ function openInv(i){
   if(!i.pac) $('invVers').placeholder='per calcolare il rendimento';
   $('invDel').hidden = !v2 || !!i.pac;
   const c=compOf(i); setTipo(tipoDaComp(c),c);
+  $('invPrev').classList.toggle('on',isPrev(i));
   openSheet('sheetInv');
 }
+$('invPrev').onclick=()=>$('invPrev').classList.toggle('on');
 $('invAcqBtn').onclick=()=>{ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true; $('acqData').value=today();
   $('acqImp').value=''; $('acqQuote').value=''; $('acqPrezzo').value=invCur&&invCur.prezzo?String(invCur.prezzo).replace('.',','):''; setTimeout(()=>$('acqImp').focus(),100); };
 $('acqSave').onclick=async()=>{
@@ -734,7 +753,7 @@ $('btnPrezzi').onclick=async()=>{
 };
 
 /* nuovo investimento */
-$('btnNuovoInv').onclick=()=>{ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); };
+$('btnNuovoInv').onclick=()=>{ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; $('niGruppo').value=''; $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); };
 $('niSave').onclick=async()=>{
   const nome=$('niNome').value.trim(); if(!nome){ toast('Dai un nome'); return; }
   const t=$('niTipo').value, classe={az:{az:100,ob:0,lq:0},ob:{az:0,ob:100,lq:0},lq:{az:0,ob:0,lq:100},mix:{az:50,ob:50,lq:0}}[t];
@@ -742,7 +761,8 @@ $('niSave').onclick=async()=>{
   if(imp && !pr && !$('niCod').value.trim()){ toast('Per il primo acquisto serve il prezzo'); return; }
   closeSheets(); toast('Creo…');
   try{
-    await api('addInvestimento',{},{nome,codice:$('niCod').value.trim(),classe});
+    const gruppo=$('niGruppo').value; await api('addInvestimento',{},{nome,codice:$('niCod').value.trim(),classe,gruppo});
+    if(gruppo){ S.prev[nome]=true; LS.set('prev',S.prev); }
     if(classe){ S.alloc[nome]=classe; LS.set('alloc',S.alloc); }
     if(imp){ await api('addAcquisto',{},{nome,data:$('niData').value||today(),importo:imp,prezzo:pr||undefined}); }
     toast('Creato ✓'); load();
@@ -751,7 +771,10 @@ $('niSave').onclick=async()=>{
 
 /* le classi scelte sul telefono passano nel foglio quando il motore le supporta */
 function migraClassi(){
-  const d=S.dash; if(!d||!d._v2||DEMO()||LS.get('classiMigrate',false)) return;
+  const d=S.dash; if(!d||!d._v2||DEMO()) return;
+  d.investimenti.filter(i=>i.gruppo==='' && S.prev[i.nome] && !LS.get('prevMigr_'+i.nome,false)).forEach(i=>{
+    LS.set('prevMigr_'+i.nome,true); api('updateInvestimento',{},{nome:i.nome,gruppo:'Previdenza'}).catch(()=>{}); });
+  if(LS.get('classiMigrate',false)) return;
   const da=d.investimenti.filter(i=>!i.classe && S.alloc[i.nome]);
   LS.set('classiMigrate',true);
   da.forEach(i=>api('updateInvestimento',{},{nome:i.nome,classe:S.alloc[i.nome]}).catch(()=>{}));
@@ -771,12 +794,12 @@ function guessComp(nome){
   return null;
 }
 const compOf = i => (S.dash&&S.dash._v2&&i.classe) || S.alloc[i.nome] || i.classe || guessComp(i.nome);
-const compLbl = c => !c ? 'da classificare' : c.az===100?'Azioni':c.ob===100?'Obbligazioni':c.lq===100?'Liquidità':`Misto ${nf(c.az,0)}/${nf(c.ob,0)}/${nf(c.lq,0)}`;
+const compLbl = c => !c ? 'da classificare' : c.az>=99.99?'Azioni':c.ob>=99.99?'Obbligazioni':c.lq>=99.99?'Liquidità':[['az','Az.'],['ob','Obbl.'],['lq','Liq.']].filter(([k])=>c[k]>=0.5).map(([k,l])=>l+' '+nf(c[k],0)+'%').join(' · ');
 const brokerConti = d => S.allocConti || d.conti.filter(c=>/directa|broker|degiro|fineco|trade|scalable|banca sella|webank|deposito/i.test(c.nome)).map(c=>c.nome);
 function renderAlloc(){
   const d=S.dash; if(!d) return;
   const tot={az:0,ob:0,lq:0}; let nc=0, ncV=0, stime=0;
-  d.investimenti.forEach(i=>{ const c=compOf(i), v=+i.valore||0; if(!v) return;
+  d.investimenti.filter(i=>!isPrev(i)).forEach(i=>{ const c=compOf(i), v=+i.valore||0; if(!v) return;
     if(!c){ nc++; ncV+=v; return; } if(c.stima) stime++;
     tot.az+=v*c.az/100; tot.ob+=v*c.ob/100; tot.lq+=v*c.lq/100; });
   const sel=brokerConti(d);
@@ -799,9 +822,9 @@ $('aConti').onclick=e=>{ const b=e.target.closest('[data-ac]'); if(!b||!S.dash) 
 let invTipo=null;
 function setTipo(t,c){ invTipo=t; [...$('invTipo').children].forEach(x=>x.classList.toggle('on',x.dataset.t===t));
   $('invMix').hidden = t!=='mix';
-  if(t==='mix'){ c=c||{az:50,ob:50,lq:0}; $('mAz').value=nf(c.az,0); $('mOb').value=nf(c.ob,0); $('mLq').value=nf(c.lq,0); } }
+  if(t==='mix'){ c=c||{az:50,ob:50,lq:0}; $('mAz').value=nf(c.az,2,true); $('mOb').value=nf(c.ob,2,true); $('mLq').value=nf(c.lq,2,true); } }
 $('invTipo').onclick=e=>{ const b=e.target.closest('[data-t]'); if(b) setTipo(b.dataset.t); };
-function tipoDaComp(c){ if(!c) return null; return c.az===100?'az':c.ob===100?'ob':c.lq===100?'lq':'mix'; }
+function tipoDaComp(c){ if(!c) return null; return c.az>=99.99?'az':c.ob>=99.99?'ob':c.lq>=99.99?'lq':'mix'; }
 function compDaForm(){
   if(invTipo==='az') return {az:100,ob:0,lq:0}; if(invTipo==='ob') return {az:0,ob:100,lq:0}; if(invTipo==='lq') return {az:0,ob:0,lq:100};
   if(invTipo==='mix'){ const a=parseNum($('mAz').value), o=parseNum($('mOb').value), l=parseNum($('mLq').value), t=a+o+l;
@@ -878,10 +901,12 @@ $('invSave').onclick=async()=>{
   const comp=compDaForm();
   if(invTipo==='mix' && !comp){ toast('Inserisci le percentuali'); return; }
   if(comp){ S.alloc[i.nome]=comp; LS.set('alloc',S.alloc); if(v2) body.classe=comp; }
+  const prevOn=$('invPrev').classList.contains('on');
+  if(prevOn!==isPrev(i)){ S.prev[i.nome]=prevOn; LS.set('prev',S.prev); if(v2) body.gruppo=prevOn?'Previdenza':''; }
   const cod=$('invCod').value.trim().toUpperCase(), codNuovo = v2 && cod!==(i.codice||'');
   if(codNuovo) body.codice=cod;
   closeSheets(); renderInv();
-  if(Object.keys(body).length===1){ toast(comp?'Tipo salvato ✓':'Nessuna modifica'); return; }
+  if(Object.keys(body).length===1){ toast('Salvato ✓'); return; }
   try{ await api('updateInvestimento',{},body);
     if(codNuovo && cod){ toast('Cerco il prezzo…'); const r=await api('aggiornaPrezzi',{},{nome:i.nome}); toast(r[0]&&r[0].ok?'Prezzo trovato ✓':'ISIN salvato, prezzo non trovato'); }
     else toast('Aggiornato ✓');
@@ -933,8 +958,9 @@ function drawPat(){
   const hide=()=>{tip.style.display='none';$('pCur').style.display='none';$('pDot').style.display='none';};
   svg.addEventListener('pointermove',show); svg.addEventListener('touchmove',e=>{show(e);e.preventDefault();},{passive:false}); svg.addEventListener('pointerleave',hide); svg.addEventListener('touchend',()=>setTimeout(hide,1200));
   // composizione
-  const liq=P.dati.liquidita||0, inv=P.dati.investimenti||0, tot=liq+inv||1;
-  $('cLiq').style.width=(liq/tot*100)+'%'; $('cInv').style.width=(inv/tot*100)+'%';
+  const pv=S.dash?prevTot(S.dash):0, liq=P.dati.liquidita||0, inv=(P.dati.investimenti||0)-pv, tot=liq+inv+pv||1;
+  $('cLiq').style.width=(liq/tot*100)+'%'; $('cInv').style.width=(inv/tot*100)+'%'; $('cPrev').style.width=(pv/tot*100)+'%';
+  $('cPrevRow').hidden=!pv; $('cPrevV').textContent=(S.priv?'':eur0(pv)+' · ')+Math.round(pv/tot*100)+'%';
   $('cLiqV').textContent=(S.priv?'':eur0(liq)+' · ')+Math.round(liq/tot*100)+'%'; $('cInvV').textContent=(S.priv?'':eur0(inv)+' · ')+Math.round(inv/tot*100)+'%';
   // lista
   $('pList').innerHTML=[...all].reverse().slice(0,36).map((p,i,arr)=>{const prev=arr[i+1]; const dv=prev?p.valore-prev.valore:null;
@@ -997,7 +1023,7 @@ const demo = (()=> {
       {nome:'PAC ETF azionario',codice:'IE00B4L5Y983',quote:0,prezzo:98.4,valore:0,versato:0,aggiornato:d(1),classe:{az:100,ob:0,lq:0},dataPrezzo:d(1),fontePrezzo:'Yahoo SWDA.MI',
         acq:[[400,1000,86.1,'Posizione iniziale'],[335,100,88.9],[305,100,90.2],[274,100,87.5],[244,100,91.8],[213,100,93.0],[183,100,92.1],[152,100,95.4],[122,100,94.0],[91,100,96.7],[61,100,97.2],[30,100,96.1]]
           .map(([g,imp,pr,note],k)=>({id:'a'+k,data:new Date(Date.now()-g*864e5).toISOString().slice(0,10),importo:imp,prezzo:pr,quote:imp/pr,note:note||''}))},
-      {nome:'Piano di accumulo',codice:'',quote:0,prezzo:0,valore:4000,versato:3800,aggiornato:d(1)}]};
+      {nome:'Fondo pensione',codice:'',quote:0,prezzo:0,valore:4000,versato:3800,aggiornato:d(1),gruppo:'Previdenza',classe:{az:29.99,ob:70.01,lq:0}}]};
 })();
 /* demo: stessi calcoli del motore (acquisti → quote, versato, prezzo medio, XIRR) */
 function xirrJs(fl){ if(fl.length<2) return null; fl=[...fl].sort((a,b)=>a.d-b.d); const t0=fl[0].d, y=f=>(f.d-t0)/31557600000;
@@ -1030,7 +1056,7 @@ function demoApi(action, params, body){
     if(!i.acq.length&&i.quote) i.acq.push({id:'a0',data:i.aggiornato,importo:i.versato||i.quote*i.prezzo,prezzo:(i.versato||i.quote*i.prezzo)/i.quote,quote:i.quote,note:'Posizione iniziale'});
     i.acq.push({id:'a'+Date.now(),data:body.data,importo:body.importo,prezzo:body.prezzo||body.importo/q,quote:q,note:''}); if(body.prezzo){ i.prezzo=body.prezzo; i.dataPrezzo=body.data; } return Promise.resolve({}); }
   if(action==='deleteAcquisto'){ demo.inv.forEach(i=>{ if(i.acq) i.acq=i.acq.filter(a=>a.id!==body.id); }); return Promise.resolve({}); }
-  if(action==='addInvestimento'){ if(demo.inv.some(x=>x.nome===body.nome)) return Promise.reject(new Error('Esiste già')); demo.inv.push({nome:body.nome,codice:body.codice||'',quote:0,prezzo:body.codice?50:0,valore:0,versato:0,aggiornato:today(),classe:body.classe||null,dataPrezzo:body.codice?today():''}); return Promise.resolve({}); }
+  if(action==='addInvestimento'){ if(demo.inv.some(x=>x.nome===body.nome)) return Promise.reject(new Error('Esiste già')); demo.inv.push({nome:body.nome,gruppo:body.gruppo||'',codice:body.codice||'',quote:0,prezzo:body.codice?50:0,valore:0,versato:0,aggiornato:today(),classe:body.classe||null,dataPrezzo:body.codice?today():''}); return Promise.resolve({}); }
   if(action==='deleteInvestimento'){ demo.inv=demo.inv.filter(x=>x.nome!==body.nome); return Promise.resolve({}); }
   if(action==='storico'){ const pts=[]; const now=new Date(); let v=15000;
     for(let i=47;i>=0;i--){ v=v*(1+(Math.sin(i)*0.012+0.008)); if(i===18) v+=8000; const d=new Date(now.getFullYear(),now.getMonth()-i,1); pts.push({mese:ym(d),valore:Math.round(v),nota:''}); }

@@ -9,13 +9,16 @@
  *     nella colonna "Codice (ISIN/ticker)" (Yahoo Finance, poi Financial Times)
  *   - tab "Acquisti": ogni acquisto (anche le rate di un PAC) con data, importo,
  *     prezzo e quote → quote totali, versato, prezzo medio e rendimento annualizzato
- *   - colonna "Classe" (Azioni / Obbligazioni / Liquidità / Misto 60/30/10)
+ *   - colonna "Classe" (Misto az/ob/liq, es. "Misto 29,99/70,01/0")
+ *   - colonna "Gruppo": "Previdenza" per i fondi pensione, tenuti separati dagli altri investimenti
+ *   - l'app riceve tutte le colonne del foglio (campo "campi") e può scriverne di nuove (campo "campi"
+ *     in updateInvestimento): le prossime funzioni non richiederanno di toccare di nuovo il motore
  *
  * Da eseguire UNA volta dall'editor: attivaPrezzi  (chiede l'autorizzazione e crea il timer)
  * Per provare senza scrivere nulla: testPrezzi
  */
 
-const INV_EXTRA = ['Classe', 'Fonte prezzo', 'Data prezzo'];
+const INV_EXTRA = ['Classe', 'Fonte prezzo', 'Data prezzo', 'Gruppo'];
 const ACQ = 'Acquisti';
 const ACQ_HEAD = ['ID', 'Data', 'Investimento', 'Importo', 'Prezzo', 'Quote', 'Note', 'Creato'];
 const COL_COD = 'Codice (ISIN/ticker)';
@@ -55,6 +58,9 @@ const COL_COD = 'Codice (ISIN/ticker)';
       const r = invRow_(d.nome);
       if (d.classe !== undefined) setInv_(r, 'Classe', typeof d.classe === 'object' ? fmtClasse_(d.classe) : d.classe);
       if (d.codice !== undefined) setInv_(r, COL_COD, String(d.codice).trim().toUpperCase());
+      if (d.gruppo !== undefined) setInv_(r, 'Gruppo', d.gruppo);
+      if (d.campi && typeof d.campi === 'object') Object.keys(d.campi).forEach(k => {
+        if (['Nome', '_row'].indexOf(k) < 0) { colonna_(k); setInv_(r, k, d.campi[k]); } });
       const numeri = ['quote', 'prezzo', 'valore', 'versato'].some(k => d[k] !== undefined && d[k] !== '');
       if (numeri) {
         orig(d);
@@ -77,6 +83,13 @@ function schema_() {
     a.setFrozenRows(1);
   }
   delete _mem['r_' + SHEETS.INV]; delete _mem['r_' + ACQ];
+}
+
+/** Crea la colonna nel foglio Investimenti se non c'è ancora. */
+function colonna_(nome) {
+  const sh = sh_(SHEETS.INV);
+  const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (head.indexOf(nome) < 0) sh.getRange(1, sh.getLastColumn() + 1).setValue(nome).setFontWeight('bold');
 }
 
 function invRow_(nome) {
@@ -113,7 +126,7 @@ function fmtClasse_(c) {
   if (c.az >= 99.99) return 'Azioni';
   if (c.ob >= 99.99) return 'Obbligazioni';
   if (c.lq >= 99.99) return 'Liquidità';
-  return 'Misto ' + [c.az, c.ob, c.lq].map(x => Math.round(x)).join('/');
+  return 'Misto ' + [c.az, c.ob, c.lq].map(x => String(Math.round(x * 100) / 100).replace('.', ',')).join('/');
 }
 
 // ============ acquisti e PAC ============
@@ -167,6 +180,9 @@ function arricchisci_(r) {
     i.classe = parseClasse_(row['Classe']);
     i.fontePrezzo = String(row['Fonte prezzo'] || '');
     i.dataPrezzo = row['Data prezzo'] ? ymd_(row['Data prezzo']) : '';
+    i.gruppo = String(row['Gruppo'] || '');
+    i.campi = {};
+    Object.keys(row).forEach(k => { if (k && k !== '_row') i.campi[k] = row[k] instanceof Date ? ymd_(row[k]) : row[k]; });
     const lista = acq.filter(a => a.investimento === i.nome);
     if (lista.length) {
       const q = lista.reduce((s, a) => s + a.quote, 0);
@@ -243,7 +259,7 @@ function addInvestimento_(d) {
   const head = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const v = { 'Nome': nome, [COL_COD]: String(d.codice || '').trim().toUpperCase(), 'Quote': num_(d.quote) || '', 'Prezzo': num_(d.prezzo) || '',
     'Valore': num_(d.valore) || '', 'Versato': num_(d.versato) || '', 'Aggiornato': new Date(),
-    'Classe': d.classe ? (typeof d.classe === 'object' ? fmtClasse_(d.classe) : d.classe) : '' };
+    'Classe': d.classe ? (typeof d.classe === 'object' ? fmtClasse_(d.classe) : d.classe) : '', 'Gruppo': d.gruppo || '' };
   sh.appendRow(head.map(h => (v[h] !== undefined ? v[h] : '')));
   delete _mem['r_' + SHEETS.INV];
   let prezzo = null;
