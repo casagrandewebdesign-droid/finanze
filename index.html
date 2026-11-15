@@ -114,6 +114,13 @@ nav button.on{color:var(--brand)}
 .alloc .note{font-size:12px;color:var(--muted);margin-top:10px}
 .alloc .chips{margin-top:4px}
 .alloc .chip{font-size:13px;padding:5px 10px}
+.invbar{display:flex;gap:8px;margin:-2px 0 4px}
+.invbar button{flex:1;border:0;background:var(--card);color:var(--ink);border-radius:14px;padding:11px;font-weight:600;font-size:14px;box-shadow:var(--shadow)}
+.invbar button:disabled{opacity:.5}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}
+.grid2 .l{font-size:12px;color:var(--muted)}.grid2 .v{font-weight:650;font-variant-numeric:tabular-nums}
+.xdel{border:0;background:none;color:var(--muted);font-size:16px;padding:6px 8px}
+.minihead{font-size:12px;color:var(--muted);margin:12px 0 2px}
 .mix{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
 .mix .field{margin-top:0;padding:2px 10px;flex-direction:column;align-items:flex-start;gap:0}
 .mix .field label{width:auto;font-size:11px;padding-top:6px}
@@ -224,6 +231,10 @@ h1{padding-right:52px}
     <div class="lbl">Valore totale</div>
     <div class="big num" id="iTot" style="margin-bottom:0">—</div>
   </div>
+  <div class="invbar" id="invBar">
+    <button id="btnPrezzi">↻ Aggiorna prezzi</button><button id="btnNuovoInv">+ Nuovo investimento</button>
+  </div>
+  <p class="sync" id="prezziInfo" style="margin:4px 0 0"></p>
   <h2>Ripartizione</h2>
   <div class="card alloc">
     <div class="comp" id="aBar"></div>
@@ -234,7 +245,7 @@ h1{padding-right:52px}
   </div>
   <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
-  <p class="sync">Tocca un investimento per aggiornare prezzo, valore o tipo.</p>
+  <p class="sync">Tocca un investimento per vedere gli acquisti, cambiare ISIN, tipo o valori.</p>
 </section>
 
 <!-- CONFRONTI SPESE -->
@@ -326,6 +337,20 @@ h1{padding-right:52px}
   <div class="sheet">
     <div class="grab"></div>
     <h2 id="invNome" style="margin-top:4px;text-transform:none;font-size:17px;color:var(--ink)"></h2>
+    <div id="invInfo" style="font-size:12px;color:var(--muted);margin:-4px 4px 10px"></div>
+    <div id="invPac"></div>
+    <div id="invAcqBox">
+      <button class="btn ghost" id="invAcqBtn" style="margin-top:0">+ Registra acquisto / rata PAC</button>
+      <div id="invAcqForm" hidden>
+        <div class="field"><label>Data</label><input id="acqData" type="date"></div>
+        <div class="field"><label>Importo €</label><input id="acqImp" inputmode="decimal" placeholder="es. 100"></div>
+        <div class="field"><label>Prezzo quota</label><input id="acqPrezzo" inputmode="decimal" placeholder="prezzo di acquisto"></div>
+        <div class="field"><label>Quote</label><input id="acqQuote" inputmode="decimal" placeholder="opzionale: calcolate dal prezzo"></div>
+        <button class="btn" id="acqSave">Salva acquisto</button>
+      </div>
+    </div>
+    <h2 style="margin-top:16px">Dati</h2>
+    <div class="field" id="invCodBox"><label>ISIN / ticker</label><input id="invCod" autocapitalize="characters" placeholder="es. LU0408877842"></div>
     <div class="field"><label>Prezzo quota</label><input id="invPrezzo" inputmode="decimal" placeholder="lascia vuoto se non serve"></div>
     <div class="field"><label>Quote</label><input id="invQuote" inputmode="decimal"></div>
     <div class="field"><label>Valore</label><input id="invValore" inputmode="decimal" placeholder="se non hai il prezzo quota"></div>
@@ -340,6 +365,24 @@ h1{padding-right:52px}
       <div class="field"><label>% Liquidità</label><input id="mLq" inputmode="decimal"></div>
     </div>
     <button class="btn" id="invSave">Aggiorna</button>
+    <button class="btn danger" id="invDel">Elimina investimento</button>
+  </div>
+</div>
+
+<!-- SHEET: nuovo investimento -->
+<div id="sheetNewInv">
+  <div class="sheet-bg" data-close></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <h2 style="margin-top:4px;text-transform:none;font-size:17px;color:var(--ink)">Nuovo investimento</h2>
+    <div class="field"><label>Nome</label><input id="niNome" placeholder="es. ETF MSCI World"></div>
+    <div class="field"><label>ISIN / ticker</label><input id="niCod" autocapitalize="characters" placeholder="per il prezzo automatico"></div>
+    <div class="field"><label>Tipo</label><select id="niTipo"><option value="">da decidere</option><option value="az">Azioni</option><option value="ob">Obbligazioni</option><option value="lq">Liquidità</option><option value="mix">Misto 50/50</option></select></div>
+    <div class="minihead">Primo acquisto (facoltativo)</div>
+    <div class="field"><label>Data</label><input id="niData" type="date"></div>
+    <div class="field"><label>Importo €</label><input id="niImp" inputmode="decimal" placeholder="es. 1000"></div>
+    <div class="field"><label>Prezzo quota</label><input id="niPrezzo" inputmode="decimal" placeholder="prezzo di acquisto"></div>
+    <button class="btn" id="niSave">Crea</button>
   </div>
 </div>
 
@@ -607,15 +650,115 @@ async function renderMov(){
 function renderInv(){
   const d=S.dash; if(!d) return;
   $('iTot').textContent=cap(d.investimentiTotale);
-  $('invList').innerHTML = d.investimenti.map(i=>`<div class="it" data-inv='${esc(JSON.stringify(i))}'>
-    <div class="ic">📈</div>
-    <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${(c=>c?esc(compLbl(c))+(c.stima?' (stima)':''):'<span class="flag">da classificare</span>')(compOf(i))} · ${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · agg. ${i.aggiornato?new Date(i.aggiornato+'T12:00').toLocaleDateString('it-IT'):'—'}</div></div>
+  const v2=!!d._v2;
+  $('invBar').style.display = v2 ? '' : 'none';
+  $('prezziInfo').textContent = v2 ? '' : (DEMO()?'':'Prezzi automatici e PAC: aggiorna il motore con il file Prezzi.gs');
+  migraClassi();
+  $('invList').innerHTML = d.investimenti.map(i=>`<div class="it" data-inv="${esc(i.nome)}">
+    <div class="ic">${i.pac?'🔁':'📈'}</div>
+    <div class="mid"><div class="t">${esc(i.nome)}</div><div class="s">${(c=>c?esc(compLbl(c))+(c.stima?' (stima)':''):'<span class="flag">da classificare</span>')(compOf(i))} · ${i.quote?nf(i.quote,3,true)+' quote × '+eur(i.prezzo,i.prezzo<10?3:2):'valore manuale'} · ${prezzoLbl(i)}</div></div>
     <div class="a num">${cap(i.valore)}${i.rendimento!=null?`<small class="${i.rendimento>=0?'pos':'neg'}">${i.rendimento>=0?'+':''}${nf(i.rendimento,2)}%</small>`:''}</div></div>`).join('') || '<div class="empty">Nessun investimento</div>';
   renderAlloc();
 }
 
+const dIt = s => s ? new Date(s+'T12:00').toLocaleDateString('it-IT',{day:'2-digit',month:'2-digit',year:'2-digit'}) : '—';
+function prezzoLbl(i){
+  if(/^⚠/.test(i.fontePrezzo||'')) return '<span class="flag">prezzo non aggiornato</span>';
+  if(i.dataPrezzo) return 'prezzo del '+dIt(i.dataPrezzo)+(i.codice?'':' (manuale)');
+  return 'agg. '+dIt(i.aggiornato);
+}
+const invByName = n => (S.dash&&S.dash.investimenti||[]).find(x=>x.nome===n);
+
+/* scheda investimento: riepilogo PAC / acquisti */
+function pacHtml(i){
+  const p=i.pac; if(!p) return '';
+  const st=(l,v,cls='')=>`<div><div class="l">${l}</div><div class="v ${cls}">${v}</div></div>`;
+  const ann = p.annualizzato==null ? '<span style="color:var(--muted);font-weight:500">dopo il 1° mese</span>'
+    : `${p.annualizzato>=0?'+':''}${nf(p.annualizzato,2)}%`;
+  const giorni=(Date.now()-new Date(p.primo+'T12:00'))/864e5;
+  return `<div class="card" style="margin-bottom:8px">
+    <div class="grid2">
+      ${st('Versato',cap(p.versato))}${st('Valore oggi',cap(i.valore))}
+      ${st('Quote',nf(p.quote,3,true))}${st('Prezzo medio di carico',p.prezzoMedio?eur(p.prezzoMedio,3):'—')}
+      ${st('Rendimento',i.rendimento!=null?(i.rendimento>=0?'+':'')+nf(i.rendimento,2)+'%':'—',i.rendimento>=0?'pos':'neg')}
+      ${st('Annualizzato',ann,p.annualizzato==null?'':p.annualizzato>=0?'pos':'neg')}
+    </div>
+    ${p.annualizzato!=null&&giorni<365?'<div class="minihead">Annualizzato su meno di un anno: indicativo, si stabilizza col tempo.</div>':''}
+    <div class="minihead">${p.n} acquist${p.n>1?'i':'o'} dal ${dIt(p.primo)}</div>
+    <div class="list">${p.acquisti.slice(0,24).map(a=>`<div class="it" style="padding:8px 0"><div class="mid"><div class="t" style="font-size:14px">${dIt(a.data)} · ${cap(a.importo)}</div>
+      <div class="s">${nf(a.quote,3,true)} quote × ${eur(a.prezzo,3)}${a.note?' · '+esc(a.note):''}</div></div>
+      <button class="xdel" data-acqdel="${esc(a.id)}" aria-label="Elimina">✕</button></div>`).join('')}</div>
+  </div>`;
+}
+let invCur=null;
+function openInv(i){
+  invCur=i; const v2=!!(S.dash&&S.dash._v2);
+  $('invNome').textContent=i.nome;
+  $('invInfo').textContent = [i.codice?('ISIN/ticker '+i.codice):'', i.fontePrezzo?('fonte: '+i.fontePrezzo):'', i.dataPrezzo?('prezzo del '+dIt(i.dataPrezzo)):''].filter(Boolean).join(' · ');
+  $('invPac').innerHTML=pacHtml(i);
+  $('invAcqBox').hidden=!v2; $('invAcqForm').hidden=true; $('invAcqBtn').hidden=false;
+  $('invCodBox').style.display=v2?'':'none'; $('invCod').value=i.codice||'';
+  const fx=n=>n?String(n).replace('.',','):'';
+  $('invPrezzo').value=fx(i.prezzo); $('invQuote').value=fx(i.quote); $('invValore').value=''; $('invVers').value=fx(i.versato);
+  $('invQuote').disabled=$('invVers').disabled=!!i.pac;
+  $('invQuote').placeholder=$('invVers').placeholder = i.pac ? 'calcolato dagli acquisti' : '';
+  if(!i.pac) $('invVers').placeholder='per calcolare il rendimento';
+  $('invDel').hidden = !v2 || !!i.pac;
+  const c=compOf(i); setTipo(tipoDaComp(c),c);
+  openSheet('sheetInv');
+}
+$('invAcqBtn').onclick=()=>{ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true; $('acqData').value=today();
+  $('acqImp').value=''; $('acqQuote').value=''; $('acqPrezzo').value=invCur&&invCur.prezzo?String(invCur.prezzo).replace('.',','):''; setTimeout(()=>$('acqImp').focus(),100); };
+$('acqSave').onclick=async()=>{
+  const b={nome:invCur.nome,data:$('acqData').value||today(),importo:parseNum($('acqImp').value),prezzo:parseNum($('acqPrezzo').value)||undefined,quote:parseNum($('acqQuote').value)||undefined};
+  if(!b.importo){ toast('Inserisci l\'importo'); return; }
+  if(!b.prezzo&&!b.quote){ toast('Serve il prezzo o le quote'); return; }
+  closeSheets();
+  try{ await api('addAcquisto',{},b); toast('Acquisto registrato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
+};
+$('invPac').onclick=async e=>{ const b=e.target.closest('[data-acqdel]'); if(!b) return;
+  if(!confirm('Eliminare questo acquisto?')) return; closeSheets();
+  try{ await api('deleteAcquisto',{},{id:b.dataset.acqdel}); toast('Eliminato'); load(); }catch(err){ toast('Errore: '+err.message); } };
+$('invDel').onclick=async()=>{ if(!invCur||!confirm('Eliminare "'+invCur.nome+'" dal foglio?')) return; closeSheets();
+  try{ await api('deleteInvestimento',{},{nome:invCur.nome}); toast('Eliminato'); load(); }catch(e){ toast('Errore: '+e.message); } };
+
+/* aggiorna prezzi */
+$('btnPrezzi').onclick=async()=>{
+  const b=$('btnPrezzi'); b.disabled=true; b.textContent='Aggiorno…';
+  try{ const r=await api('aggiornaPrezzi',{},{}); const ok=r.filter(x=>x.ok).length, ko=r.filter(x=>!x.ok);
+    toast(!r.length?'Nessun investimento con ISIN':ko.length?`${ok} aggiornati, ${ko.length} non trovati`:`Prezzi aggiornati ✓ (${ok})`);
+    if(ko.length) $('prezziInfo').textContent='Non trovati: '+ko.map(x=>x.nome).join(', ')+' — controlla l\'ISIN';
+    await load(); }
+  catch(e){ toast('Errore: '+e.message); }
+  b.disabled=false; b.textContent='↻ Aggiorna prezzi';
+};
+
+/* nuovo investimento */
+$('btnNuovoInv').onclick=()=>{ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); };
+$('niSave').onclick=async()=>{
+  const nome=$('niNome').value.trim(); if(!nome){ toast('Dai un nome'); return; }
+  const t=$('niTipo').value, classe={az:{az:100,ob:0,lq:0},ob:{az:0,ob:100,lq:0},lq:{az:0,ob:0,lq:100},mix:{az:50,ob:50,lq:0}}[t];
+  const imp=parseNum($('niImp').value), pr=parseNum($('niPrezzo').value);
+  if(imp && !pr && !$('niCod').value.trim()){ toast('Per il primo acquisto serve il prezzo'); return; }
+  closeSheets(); toast('Creo…');
+  try{
+    await api('addInvestimento',{},{nome,codice:$('niCod').value.trim(),classe});
+    if(classe){ S.alloc[nome]=classe; LS.set('alloc',S.alloc); }
+    if(imp){ await api('addAcquisto',{},{nome,data:$('niData').value||today(),importo:imp,prezzo:pr||undefined}); }
+    toast('Creato ✓'); load();
+  }catch(e){ toast('Errore: '+e.message); load(); }
+};
+
+/* le classi scelte sul telefono passano nel foglio quando il motore le supporta */
+function migraClassi(){
+  const d=S.dash; if(!d||!d._v2||DEMO()||LS.get('classiMigrate',false)) return;
+  const da=d.investimenti.filter(i=>!i.classe && S.alloc[i.nome]);
+  LS.set('classiMigrate',true);
+  da.forEach(i=>api('updateInvestimento',{},{nome:i.nome,classe:S.alloc[i.nome]}).catch(()=>{}));
+}
+
 /* ================== Ripartizione azioni / obbligazioni / liquidità ==================
-   La classificazione è salvata sul telefono (il motore non ha ancora questo campo). */
+   Con il motore aggiornato la classificazione sta nel foglio (colonna Classe); altrimenti sul telefono. */
 const CLS=[['az','Azioni','var(--brand)'],['ob','Obbligazioni','var(--accent)'],['lq','Liquidità','#7d9bbd']];
 S.alloc = LS.get('alloc',{}); S.allocConti = LS.get('allocConti',null);
 // ipotesi automatica dal nome, finché non la confermi tu
@@ -627,7 +770,7 @@ function guessComp(nome){
   if(/azion|equity|stock|msci|s&p|ftse|nasdaq|world|etf/.test(n)) return {az:100,ob:0,lq:0,stima:true};
   return null;
 }
-const compOf = i => S.alloc[i.nome] || guessComp(i.nome);
+const compOf = i => (S.dash&&S.dash._v2&&i.classe) || S.alloc[i.nome] || i.classe || guessComp(i.nome);
 const compLbl = c => !c ? 'da classificare' : c.az===100?'Azioni':c.ob===100?'Obbligazioni':c.lq===100?'Liquidità':`Misto ${nf(c.az,0)}/${nf(c.ob,0)}/${nf(c.lq,0)}`;
 const brokerConti = d => S.allocConti || d.conti.filter(c=>/directa|broker|degiro|fineco|trade|scalable|banca sella|webank|deposito/i.test(c.nome)).map(c=>c.nome);
 function renderAlloc(){
@@ -713,10 +856,7 @@ document.addEventListener('click',e=>{
     $('detConf').style.display=daVer?'':'none';
     openSheet('sheetDet'); return; }
   const inv=e.target.closest('[data-inv]');
-  if(inv){ const i=JSON.parse(inv.dataset.inv); $('invNome').textContent=i.nome;
-    $('invPrezzo').value=i.prezzo?String(i.prezzo).replace('.',','):''; $('invQuote').value=i.quote?String(i.quote).replace('.',','):'';
-    $('invValore').value=''; $('invVers').value=i.versato?String(i.versato).replace('.',','):'';
-    const c=compOf(i); setTipo(tipoDaComp(c),c); openSheet('sheetInv'); return; }
+  if(inv){ const i=invByName(inv.dataset.inv); if(i) openInv(i); return; }
   if(e.target.closest('[data-close]')) closeSheets();
 });
 function editBody(){ const b={id:detMov.id,fp:detMov.fp,categoria:$('eCat').value,descrizione:$('eDesc').value.trim(),importo:parseNum($('eImp').value)};
@@ -729,17 +869,23 @@ $('detConf').onclick=async()=>{ if(!detMov) return; const b=editBody(); closeShe
 $('detDel').onclick=async()=>{ if(!detMov) return; if(!confirm('Eliminare questo movimento anche dal foglio?')) return; closeSheets();
   try{ await api('deleteMovimento',{},{id:detMov.id,fp:detMov.fp}); afterWrite('Eliminato'); }catch(e){ toast('Errore: '+e.message); } };
 $('invSave').onclick=async()=>{
-  const body={nome:$('invNome').textContent};
-  if($('invPrezzo').value) body.prezzo=parseNum($('invPrezzo').value);
-  if($('invQuote').value) body.quote=parseNum($('invQuote').value);
-  if($('invValore').value) body.valore=parseNum($('invValore').value);
-  if($('invVers').value) body.versato=parseNum($('invVers').value);
+  const i=invCur, v2=!!(S.dash&&S.dash._v2), body={nome:i.nome}, num=x=>parseNum($(x).value);
+  const fx=n=>n?String(n).replace('.',','):'';
+  if($('invPrezzo').value && $('invPrezzo').value!==fx(i.prezzo)) body.prezzo=num('invPrezzo');
+  if(!i.pac && $('invQuote').value && $('invQuote').value!==fx(i.quote)) body.quote=num('invQuote');
+  if($('invValore').value) body.valore=num('invValore');
+  if(!i.pac && $('invVers').value && $('invVers').value!==fx(i.versato)) body.versato=num('invVers');
   const comp=compDaForm();
   if(invTipo==='mix' && !comp){ toast('Inserisci le percentuali'); return; }
-  if(comp){ S.alloc[body.nome]=comp; LS.set('alloc',S.alloc); }
+  if(comp){ S.alloc[i.nome]=comp; LS.set('alloc',S.alloc); if(v2) body.classe=comp; }
+  const cod=$('invCod').value.trim().toUpperCase(), codNuovo = v2 && cod!==(i.codice||'');
+  if(codNuovo) body.codice=cod;
   closeSheets(); renderInv();
-  if(Object.keys(body).length===1){ toast('Tipo salvato ✓'); return; }
-  try{ await api('updateInvestimento',{},body); toast('Aggiornato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
+  if(Object.keys(body).length===1){ toast(comp?'Tipo salvato ✓':'Nessuna modifica'); return; }
+  try{ await api('updateInvestimento',{},body);
+    if(codNuovo && cod){ toast('Cerco il prezzo…'); const r=await api('aggiornaPrezzi',{},{nome:i.nome}); toast(r[0]&&r[0].ok?'Prezzo trovato ✓':'ISIN salvato, prezzo non trovato'); }
+    else toast('Aggiornato ✓');
+    load(); }catch(e){ toast('Errore: '+e.message); }
 };
 
 /* ================== Patrimonio ================== */
@@ -847,8 +993,27 @@ const demo = (()=> {
         base.forEach(([c,v,ds],j)=>{ let x=v*(0.6+rnd()*0.8); if(c==='Vacanze') x=(dt.getMonth()===7||dt.getMonth()===11)?600+rnd()*500:0; if(c==='Ristoranti e bar'&&dt.getMonth()===11) x*=1.6;
           if(x>1) out.push({id:'h'+k+'_'+j,data:mm+'-'+String(3+j*3).padStart(2,'0'),importo:-Math.round(x*100)/100,tipo:'uscite',categoria:c,descrizione:ds,conto:'Conto principale',fonte:'App'}); }); }
       return out; })(),
-    inv:[{nome:'Fondo obbligazionario',codice:'',quote:150,prezzo:11.3,valore:1695,versato:1650,rendimento:2.73,aggiornato:d(1)},{nome:'Piano di accumulo',codice:'',quote:0,prezzo:0,valore:4000,versato:3800,rendimento:5.26,aggiornato:d(1)}]};
+    inv:[{nome:'Fondo obbligazionario',codice:'LU0408877842',quote:150,prezzo:11.3,valore:1695,versato:1650,aggiornato:d(1),classe:{az:0,ob:100,lq:0},dataPrezzo:d(1),fontePrezzo:'Yahoo 0P0000JBMR.F'},
+      {nome:'PAC ETF azionario',codice:'IE00B4L5Y983',quote:0,prezzo:98.4,valore:0,versato:0,aggiornato:d(1),classe:{az:100,ob:0,lq:0},dataPrezzo:d(1),fontePrezzo:'Yahoo SWDA.MI',
+        acq:[[400,1000,86.1,'Posizione iniziale'],[335,100,88.9],[305,100,90.2],[274,100,87.5],[244,100,91.8],[213,100,93.0],[183,100,92.1],[152,100,95.4],[122,100,94.0],[91,100,96.7],[61,100,97.2],[30,100,96.1]]
+          .map(([g,imp,pr,note],k)=>({id:'a'+k,data:new Date(Date.now()-g*864e5).toISOString().slice(0,10),importo:imp,prezzo:pr,quote:imp/pr,note:note||''}))},
+      {nome:'Piano di accumulo',codice:'',quote:0,prezzo:0,valore:4000,versato:3800,aggiornato:d(1)}]};
 })();
+/* demo: stessi calcoli del motore (acquisti → quote, versato, prezzo medio, XIRR) */
+function xirrJs(fl){ if(fl.length<2) return null; fl=[...fl].sort((a,b)=>a.d-b.d); const t0=fl[0].d, y=f=>(f.d-t0)/31557600000;
+  if(y(fl[fl.length-1])<30/365) return null; const npv=r=>fl.reduce((s,f)=>s+f.v/Math.pow(1+r,y(f)),0);
+  let lo=-.99,hi=10,flo=npv(lo); if(flo*npv(hi)>0) return null;
+  for(let k=0;k<200;k++){ const m=(lo+hi)/2,fm=npv(m); if(Math.abs(fm)<1e-7) return m; if(flo*fm<0) hi=m; else {lo=m;flo=fm;} } return (lo+hi)/2; }
+function demoInv(i){
+  const o={...i}; delete o.acq;
+  if(i.acq&&i.acq.length){ const l=[...i.acq].sort((a,b)=>a.data<b.data?-1:1), q=l.reduce((s,a)=>s+a.quote,0), v=l.reduce((s,a)=>s+a.importo,0);
+    o.quote=q; o.versato=v; o.valore=q*i.prezzo;
+    const x=xirrJs([...l.map(a=>({d:new Date(a.data+'T12:00'),v:-a.importo})),{d:new Date(),v:o.valore}]);
+    o.pac={n:l.length,quote:q,versato:v,prezzoMedio:v/q,primo:l[0].data,ultimo:l[l.length-1].data,annualizzato:x==null?null:Math.round(x*10000)/100,acquisti:[...l].reverse()}; }
+  else if(i.quote&&i.prezzo) o.valore=i.quote*i.prezzo;
+  o.rendimento=o.versato?Math.round((o.valore-o.versato)/o.versato*10000)/100:null;
+  return o;
+}
 function demoApi(action, params, body){
   const tipoOf=m=>m.tipo||(m.importo>=0?'entrate':'uscite');
   if(action==='config') return Promise.resolve({categorie:demo.categorie,conti:demo.conti});
@@ -856,7 +1021,17 @@ function demoApi(action, params, body){
   if(action==='addMovimento'){ let imp=Math.abs(body.importo); const tipo=body.tipo||(body.segno==='entrata'?'entrate':'uscite'); if(tipo!=='entrate') imp=-imp;
     demo.movs.push({...body,importo:imp,tipo,id:'d'+Date.now()}); return Promise.resolve({}); }
   if(action==='deleteMovimento'){ demo.movs=demo.movs.filter(x=>x.id!==body.id); return Promise.resolve({}); }
-  if(action==='updateInvestimento'){ const i=demo.inv.find(x=>x.nome===body.nome); Object.assign(i,body); i.valore=i.quote&&i.prezzo?i.quote*i.prezzo:(body.valore??i.valore); i.rendimento=i.versato?Math.round((i.valore-i.versato)/i.versato*10000)/100:null; return Promise.resolve({}); }
+  const INV=n=>{ const i=demo.inv.find(x=>x.nome===n); if(!i) return Promise.reject(new Error('Investimento non trovato')); return i; };
+  if(action==='updateInvestimento'){ const i=INV(body.nome); const {classe,...rest}=body; Object.assign(i,rest); if(classe) i.classe=classe;
+    if(body.prezzo){ i.dataPrezzo=today(); i.fontePrezzo='manuale'; } if(body.valore&&!body.prezzo) i.valore=body.valore; return Promise.resolve({}); }
+  if(action==='aggiornaPrezzi'){ const r=demo.inv.filter(i=>i.codice&&(!body.nome||i.nome===body.nome)).map(i=>{ i.prezzo=Math.round(i.prezzo*(1+(Math.random()-.45)*.01)*1000)/1000; i.dataPrezzo=today(); return {nome:i.nome,ok:true,prezzo:i.prezzo}; });
+    return new Promise(res=>setTimeout(()=>res(r),600)); }
+  if(action==='addAcquisto'){ const i=INV(body.nome); i.acq=i.acq||[]; const q=body.quote||body.importo/body.prezzo;
+    if(!i.acq.length&&i.quote) i.acq.push({id:'a0',data:i.aggiornato,importo:i.versato||i.quote*i.prezzo,prezzo:(i.versato||i.quote*i.prezzo)/i.quote,quote:i.quote,note:'Posizione iniziale'});
+    i.acq.push({id:'a'+Date.now(),data:body.data,importo:body.importo,prezzo:body.prezzo||body.importo/q,quote:q,note:''}); if(body.prezzo){ i.prezzo=body.prezzo; i.dataPrezzo=body.data; } return Promise.resolve({}); }
+  if(action==='deleteAcquisto'){ demo.inv.forEach(i=>{ if(i.acq) i.acq=i.acq.filter(a=>a.id!==body.id); }); return Promise.resolve({}); }
+  if(action==='addInvestimento'){ if(demo.inv.some(x=>x.nome===body.nome)) return Promise.reject(new Error('Esiste già')); demo.inv.push({nome:body.nome,codice:body.codice||'',quote:0,prezzo:body.codice?50:0,valore:0,versato:0,aggiornato:today(),classe:body.classe||null,dataPrezzo:body.codice?today():''}); return Promise.resolve({}); }
+  if(action==='deleteInvestimento'){ demo.inv=demo.inv.filter(x=>x.nome!==body.nome); return Promise.resolve({}); }
   if(action==='storico'){ const pts=[]; const now=new Date(); let v=15000;
     for(let i=47;i>=0;i--){ v=v*(1+(Math.sin(i)*0.012+0.008)); if(i===18) v+=8000; const d=new Date(now.getFullYear(),now.getMonth()-i,1); pts.push({mese:ym(d),valore:Math.round(v),nota:''}); }
     return Promise.resolve({punti:pts,attuale:pts[pts.length-1].valore,liquidita:Math.round(v*0.8),investimenti:Math.round(v*0.2)}); }
@@ -866,8 +1041,9 @@ function demoApi(action, params, body){
   const budget=demo.categorie.filter(c=>c.tipo==='uscite'&&(c.budget||sp[c.nome])).map(c=>({categoria:c.nome,budget:c.budget,speso:sp[c.nome]||0,residuo:c.budget-(sp[c.nome]||0)})).sort((a,b)=>(b.speso/(b.budget||1))-(a.speso/(a.budget||1)));
   const bt=budget.reduce((s,b)=>s+b.budget,0), bs=budget.filter(b=>b.budget).reduce((s,b)=>s+b.speso,0);
   const now=new Date(), left=new Date(now.getFullYear(),now.getMonth()+1,0).getDate()-now.getDate()+1;
-  const liq=demo.conti.reduce((s,c)=>s+c.saldo,0)+ms.reduce((s,x)=>s+x.importo,0), inv=demo.inv.reduce((s,i)=>s+i.valore,0);
-  return Promise.resolve({patrimonio:liq+inv,liquidita:liq,investimentiTotale:inv,conti:demo.conti,investimenti:demo.inv,entrate:ent,uscite:usc,saldo:ent-usc,
+  const invs=demo.inv.map(demoInv);
+  const liq=demo.conti.reduce((s,c)=>s+c.saldo,0)+ms.reduce((s,x)=>s+x.importo,0), inv=invs.reduce((s,i)=>s+i.valore,0);
+  return Promise.resolve({_v2:true,patrimonio:liq+inv,liquidita:liq,investimentiTotale:inv,conti:demo.conti,investimenti:invs,entrate:ent,uscite:usc,saldo:ent-usc,
     tassoRisparmio:ent?(ent-usc)/ent*100:null,budget,budgetTotale:bt,budgetResiduo:bt-bs,alGiorno:Math.max(0,bt-bs)/left,ultimi:[...ms].sort((a,b)=>a.data<b.data?1:-1).slice(0,8)});
 }
 
