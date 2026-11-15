@@ -794,17 +794,22 @@ async function caricaSto(){
   catch(e){ if(!c) $('stoChart').innerHTML='<div class="empty">'+(/sconosciuta/i.test(e.message)?'Per lo storico va aggiunto al motore il file Storico.gs':'Storico non disponibile: '+esc(e.message))+'</div>'; $('stoVar').textContent=''; }
 }
 function disegnaSto(d){
-  const i=STO.i, usaPrezzi=d.prezzi&&d.prezzi.length>1;
-  const pts=usaPrezzi ? d.prezzi.map(x=>({d:x.d,v:x.p})) : (d.valori||[]).map(x=>({d:x.d,v:x.v}));
+  const i=STO.i, valP=(d.valori||[]).filter(x=>x.p), usaYahoo=d.prezzi&&d.prezzi.length>1, usaPrezzi=usaYahoo||valP.length>1;
+  const pts=usaYahoo ? d.prezzi.map(x=>({d:x.d,v:x.p})) : usaPrezzi ? valP.map(x=>({d:x.d,v:x.p})) : (d.valori||[]).map(x=>({d:x.d,v:x.v}));
+  if(pts.length && i.prezzo && usaPrezzi && pts[pts.length-1].d<today()) pts.push({d:i.dataPrezzo||today(),v:i.prezzo});
+  if(pts.length && !usaPrezzi && pts[pts.length-1].d<today()) pts.push({d:today(),v:i.valore});
+  // prezzo (o valore) di riferimento dell'acquisto
+  const carico = usaPrezzi ? (i.pac&&i.pac.prezzoMedio) || (i.versato&&i.quote?i.versato/i.quote:null) : null;
   if(pts.length<2){ $('stoChart').innerHTML='<div class="empty" style="padding:30px 10px">'+(usaPrezzi||!i.codice?'Lo storico si costruisce da oggi: ogni aggiornamento salva il valore del giorno.':'Prezzi storici non trovati'+(d.errore?' ('+esc(d.errore)+')':''))+'</div>'; $('stoVar').textContent=''; return; }
   const W=360,H=190,pl=4,pr=4,pt=14,pb=22, n=pts.length;
-  const vs=pts.map(p=>p.v), mn=Math.min(...vs), mx=Math.max(...vs), pad=(mx-mn)*.12||mx*.01||1;
+  const vs=pts.map(p=>p.v), mn=Math.min(...vs,carico||Infinity), mx=Math.max(...vs,carico||-Infinity), pad=(mx-mn)*.12||mx*.01||1;
   const lo=mn-pad, hi=mx+pad, X=k=>pl+(W-pl-pr)*k/(n-1), Y=v=>pt+(hi-v)*(H-pt-pb)/(hi-lo);
   const up=vs[n-1]>=vs[0], col=up?'var(--pos)':'var(--neg)';
   const line=pts.map((p,k)=>(k?'L':'M')+X(k).toFixed(1)+' '+Y(p.v).toFixed(1)).join(' ');
   const fmt=v=>usaPrezzi?eur(v,v<10?3:2):cap(v,eur0);
   let g=`<defs><linearGradient id="stoG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${up?'#16855f':'#c2412d'}" stop-opacity=".22"/><stop offset="1" stop-color="${up?'#16855f':'#c2412d'}" stop-opacity="0"/></linearGradient></defs>`;
   g+=[mx,mn].map(v=>`<line x1="0" x2="${W}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-dasharray="3 4"/><text x="${W}" y="${Y(v)-3}" text-anchor="end" font-size="9.5" fill="var(--muted)">${S.priv&&!usaPrezzi?'':fmt(v)}</text>`).join('');
+  if(carico) g+=`<line x1="0" x2="${W}" y1="${Y(carico).toFixed(1)}" y2="${Y(carico).toFixed(1)}" stroke="#c98a10" stroke-width="1.3" stroke-dasharray="5 4"/><text x="4" y="${(Y(carico)-4).toFixed(1)}" font-size="9.5" font-weight="600" fill="#c98a10">prezzo di acquisto ${eur(carico,3)}</text>`;
   g+=`<path d="${line} L${X(n-1)} ${H-pb} L${X(0)} ${H-pb} Z" fill="url(#stoG)"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2.2" stroke-linejoin="round"/>`;
   // acquisti sul grafico
   if(i.pac&&usaPrezzi) i.pac.acquisti.forEach(a=>{ if(a.data<pts[0].d) return; let k=pts.findIndex(p=>p.d>=a.data); if(k<0) k=n-1;
@@ -820,12 +825,14 @@ function disegnaSto(d){
     $('stoDot').setAttribute('cx',X(k)); $('stoDot').setAttribute('cy',Y(p.v)); $('stoDot').style.display='';
     tip.style.display='block'; tip.style.left=Math.max(60,Math.min(r.width-60,X(k)*r.width/W))+'px';
     const val = usaPrezzi&&i.quote ? ' · valore '+cap(p.v*i.quote,eur0) : '';
-    tip.textContent=new Date(p.d+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})+' · '+fmt(p.v)+val; };
+    const rif = carico ? (p.v/carico-1)*100 : (p.v/pts[0].v-1)*100;
+    tip.innerHTML=`<b>${new Date(p.d+'T12:00').toLocaleDateString('it-IT',{day:'numeric',month:'short',year:'numeric'})}</b> · ${fmt(p.v)}${val}<br><span style="color:${rif>=0?'#7fe0b5':'#ff9c8a'}">${rif>=0?'+':''}${nf(rif,2)}%</span> ${carico?'rispetto all\'acquisto':'da inizio periodo'}`; };
   const hide=()=>{ tip.style.display='none'; $('stoCur').style.display='none'; $('stoDot').style.display='none'; };
   svg.addEventListener('pointermove',show); svg.addEventListener('pointerdown',show);
   svg.addEventListener('touchmove',e=>{show(e);e.preventDefault();},{passive:false}); svg.addEventListener('pointerleave',hide); svg.addEventListener('touchend',()=>setTimeout(hide,1800));
-  const vr=(vs[n-1]-vs[0])/vs[0]*100;
-  $('stoVar').innerHTML=`${usaPrezzi?'Prezzo quota':'Valore'} nel periodo: <b class="${vr>=0?'pos':'neg'}">${vr>=0?'+':''}${nf(vr,2)}%</b>${i.pac&&usaPrezzi?' · <span class="dot" style="background:var(--accent);border:1px solid var(--ink)"></span>i tuoi acquisti':''}`;
+  const vr=(vs[n-1]-vs[0])/vs[0]*100, da=carico?(vs[n-1]/carico-1)*100:null;
+  const pc=x=>`<b class="${x>=0?'pos':'neg'}">${x>=0?'+':''}${nf(x,2)}%</b>`;
+  $('stoVar').innerHTML=`${usaPrezzi?'Prezzo':'Valore'} nel periodo ${pc(vr)}${da!=null?' · dall\'acquisto '+pc(da):''}${!usaPrezzi?' <br><span style="font-size:11px">il valore include i nuovi versamenti</span>':''}${i.pac&&i.pac.n>1&&usaPrezzi?' · <span class="dot" style="background:var(--accent);border:1px solid var(--ink)"></span>acquisti':''}`;
 }
 
 /* aggiorna prezzi */
@@ -1161,7 +1168,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='10 · 15/11 02:55';
+const VERSIONE='11 · 15/11 03:10';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
