@@ -188,6 +188,7 @@ h1{padding-right:52px}
   <h2>Ultimi movimenti</h2>
   <div class="card list" id="lastList"></div>
   <div class="sync" id="syncInfo"></div>
+  <div class="sync" id="verInfo"></div>
 </section>
 
 <!-- MOVIMENTI -->
@@ -1065,7 +1066,14 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+const VERSIONE='8 · 15/11 02:35';
+try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
+if('serviceWorker' in navigator && location.protocol==='https:'){
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
+  // quando arriva una versione nuova dell'app, ricarica una volta da solo
+  let ricaricata=false; const avevaSW=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(avevaSW && !ricaricata){ ricaricata=true; location.reload(); } });
+}
 load();
 </script>
 </body>
