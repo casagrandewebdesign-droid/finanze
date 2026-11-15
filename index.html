@@ -165,9 +165,23 @@ h1{padding-right:52px}
 .tbl th:first-child,.tbl td:first-child{text-align:left;padding-left:0}
 .tbl td{text-align:right;padding:8px 0 8px 5px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
 .tbl td:first-child{white-space:normal;min-width:96px;font-size:12.5px}
+/* blocco Face ID */
+#lock{position:fixed;inset:0;z-index:9999;background:var(--brand);color:var(--brand-ink);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px}
+#lock[hidden]{display:none}
+#lock .ic{width:84px;height:84px;border-radius:26px;background:rgba(255,255,255,.14);display:grid;place-items:center}
+#lock .t{font-size:22px;font-weight:700;letter-spacing:-.01em}
+#lock button{border:0;border-radius:14px;padding:14px 26px;font:600 17px -apple-system,sans-serif;background:var(--accent);color:#15211d}
+#lock .err{font-size:13px;opacity:.8;min-height:18px;text-align:center}
 </style>
 </head>
 <body>
+
+<div id="lock" hidden>
+  <div class="ic"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div>
+  <div class="t">Finanze è bloccata</div>
+  <button id="lockBtn">Sblocca con Face ID</button>
+  <div class="err" id="lockErr"></div>
+</div>
 
 <div id="demoBanner" class="demo" hidden>Modalità demo: dati di esempio. Collega il tuo motore da <b>Impostazioni</b>.</div>
 
@@ -289,6 +303,9 @@ h1{padding-right:52px}
   <div class="field"><label>Token</label><input id="cfgTok" type="password" placeholder="token segreto" autocomplete="off" autocapitalize="off"></div>
   <button class="btn" id="cfgSave">Salva e collega</button>
   <button class="btn ghost" id="cfgDemo">Usa dati demo</button>
+  <h2>Sicurezza</h2>
+  <button class="btn" id="fidBtn">Attiva blocco con Face ID</button>
+  <p class="sync" id="fidInfo">All'apertura l'app chiederà Face ID.</p>
   <h2>Conti</h2>
   <div class="card list" id="contiList"></div>
   <p class="sync">I dati vivono nel tuo foglio "Finanze App - Database" su Google Drive.</p>
@@ -1190,7 +1207,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='12 · 15/11 03:20';
+const VERSIONE='13 · 15/11 03:30';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
@@ -1198,6 +1215,58 @@ if('serviceWorker' in navigator && location.protocol==='https:'){
   let ricaricata=false; const avevaSW=!!navigator.serviceWorker.controller;
   navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(avevaSW && !ricaricata){ ricaricata=true; location.reload(); } });
 }
+/* ================== Blocco Face ID (passkey WebAuthn) ================== */
+// Protegge l'interfaccia sul telefono; i dati restano protetti dal token del motore.
+const FID = (() => {
+  const KEY='fin_faceid', GRAZIA=30000;   // se torni entro 30 s non richiede Face ID
+  const rnd=n=>crypto.getRandomValues(new Uint8Array(n));
+  const toB64=b=>btoa(String.fromCharCode(...new Uint8Array(b)));
+  const fromB64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+  const cred=()=>{ try{return localStorage.getItem(KEY)}catch(e){return null} };
+  const ok=()=>!!(window.PublicKeyCredential&&navigator.credentials);
+  let uscita=0;
+  async function verifica(){
+    await navigator.credentials.get({publicKey:{challenge:rnd(32),userVerification:'required',timeout:60000,
+      allowCredentials:[{type:'public-key',id:fromB64(cred())}]}});
+  }
+  async function sblocca(auto){
+    $('lockErr').textContent='';
+    try{ await verifica(); $('lock').hidden=true; }
+    catch(e){ if(!auto) $('lockErr').textContent='Non riconosciuto, riprova.'; }
+  }
+  function blocca(){ if(cred()) $('lock').hidden=false; }
+  async function attiva(){
+    const c=await navigator.credentials.create({publicKey:{challenge:rnd(32),rp:{name:'Finanze'},
+      user:{id:rnd(16),name:'federico',displayName:'Federico'},
+      pubKeyCredParams:[{type:'public-key',alg:-7},{type:'public-key',alg:-257}],
+      authenticatorSelection:{authenticatorAttachment:'platform',userVerification:'required',residentKey:'preferred'},timeout:60000}});
+    localStorage.setItem(KEY,toB64(c.rawId));
+  }
+  function paint(){
+    const on=!!cred();
+    $('fidBtn').textContent=on?'Disattiva blocco con Face ID':'Attiva blocco con Face ID';
+    $('fidBtn').classList.toggle('ghost',on);
+    $('fidInfo').textContent=!ok()?'Face ID non disponibile su questo dispositivo.':on?'Attivo: all\'apertura l\'app chiede Face ID.':'All\'apertura l\'app chiederà Face ID.';
+  }
+  $('fidBtn').onclick=async()=>{
+    if(!ok()) return toast('Face ID non disponibile qui');
+    try{
+      if(cred()){ await verifica(); localStorage.removeItem(KEY); toast('Blocco disattivato'); }
+      else { await attiva(); toast('Blocco con Face ID attivo'); }
+    }catch(e){ toast('Operazione annullata'); }
+    paint();
+  };
+  $('lockBtn').onclick=()=>sblocca(false);
+  document.addEventListener('visibilitychange',()=>{
+    if(!cred()) return;
+    if(document.hidden){ uscita=Date.now(); $('lock').hidden=false; }   // copre anche l'anteprima nel multitasking
+    else if(Date.now()-uscita<GRAZIA) $('lock').hidden=true;
+    else sblocca(true);
+  });
+  paint();
+  if(cred()){ blocca(); sblocca(true); }
+})();
+
 load();
 </script>
 </body>
