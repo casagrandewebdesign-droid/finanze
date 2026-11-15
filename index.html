@@ -591,21 +591,26 @@ function drawTrend(){
   // serie: categorie scelte, oppure il totale delle uscite se non ne scegli nessuna
   const series = sel.length ? sel.map((c,k)=>({nome:c,col:SER[k],v:perMese.map(o=>o?(Math.max(0,o[c]||0)):null)}))
     : [{nome:'Tutte le uscite',col:SER[0],v:perMese.map(o=>o?Object.values(o).reduce((s,x)=>s+Math.max(0,x),0):null)}];
-  const W=360,H=200,pl=4,pr=4,pt=14,pb=22, n=mesi.length, cw=(W-pl-pr)/n;
+  const W=360,H=220,pl=4,pr=4,pt=22,pb=22, n=mesi.length, cw=(W-pl-pr)/n;
+  const kf=v=>v>=1000?nf(v/1000,v>=10000?0:1,true)+'k':nf(v,0); // etichette compatte: 1,2k
   const stack = C.tipo==='bar';
   const colTot = mesi.map((_,i)=>series.reduce((s,se)=>s+(se.v[i]||0),0));
   const mx = (stack?Math.max(...colTot):Math.max(...series.flatMap(s=>s.v.map(x=>x||0))))*1.1 || 100;
   const Y=v=>pt+(mx-v)*(H-pt-pb)/mx, Xc=i=>pl+cw*i+cw/2;
   let g=`<g>${mesi.map((m,i)=>perSet.has(m)?`<rect x="${pl+cw*i}" y="${pt-8}" width="${cw}" height="${H-pt-pb+8}" fill="var(--brand)" opacity=".07"/>`:'').join('')}</g>`;
-  g+=[0,.5,1].map(f=>{const v=mx*f,y=Y(v);return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="3 4"/>${f?`<text x="${W}" y="${y-3}" text-anchor="end" font-size="10" fill="var(--muted)">${nf(v,0)}</text>`:''}`;}).join('');
+  g+=[0,.5,1].map(f=>{const v=mx*f,y=Y(v);return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="3 4"/>`;}).join('');
   if(stack){
     mesi.forEach((m,i)=>{ let base=0; series.forEach(se=>{ const v=se.v[i]||0; if(!v) return; const y0=Y(base), y1=Y(base+v);
-      g+=`<rect x="${(Xc(i)-cw*.32).toFixed(1)}" y="${y1.toFixed(1)}" width="${(cw*.64).toFixed(1)}" height="${Math.max(0,y0-y1).toFixed(1)}" fill="${se.col}" rx="2"/>`; base+=v; }); });
+      g+=`<rect x="${(Xc(i)-cw*.32).toFixed(1)}" y="${y1.toFixed(1)}" width="${(cw*.64).toFixed(1)}" height="${Math.max(0,y0-y1).toFixed(1)}" fill="${se.col}" rx="2"/>`;
+      if(series.length>1 && y0-y1>=13) g+=`<text x="${Xc(i)}" y="${((y0+y1)/2+3).toFixed(1)}" text-anchor="middle" font-size="8" font-weight="600" fill="#fff">${kf(v)}</text>`;
+      base+=v; });
+      if(colTot[i]) g+=`<text x="${Xc(i)}" y="${(Y(colTot[i])-4).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="700" fill="var(--ink)">${kf(colTot[i])}</text>`; });
   } else {
     series.forEach(se=>{ const d=se.v.map((v,i)=>v==null?null:[Xc(i),Y(v)]).filter(Boolean);
       if(!d.length) return;
       g+=`<path d="${d.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')}" fill="none" stroke="${se.col}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>`+
-        d.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${se.col}"/>`).join(''); });
+        d.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.6" fill="${se.col}"/>`).join('')+
+        se.v.map((v,i)=>v?`<text x="${Xc(i)}" y="${(Y(v)-6).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="700" fill="${se.col}" paint-order="stroke" stroke="var(--card)" stroke-width="3">${kf(v)}</text>`:'').join(''); });
   }
   g+=mesi.map((m,i)=>i%2===(n-1)%2?`<text x="${Xc(i)}" y="${H-6}" text-anchor="middle" font-size="10" fill="var(--muted)">${new Date(...m.split('-').map((x,j)=>j?x-1:+x),1).toLocaleDateString('it-IT',{month:'short'})}</text>`:'').join('');
   $('cChart').innerHTML=`<div class="tip" id="cTip"></div><svg viewBox="0 0 ${W} ${H}" id="cSvg">${g}<line id="cCur" y1="${pt-8}" y2="${H-pb}" stroke="var(--muted)" stroke-width="1" style="display:none"/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
