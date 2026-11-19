@@ -469,13 +469,19 @@ h1{padding-right:52px}
     <div id="stoStats" style="margin-top:8px"></div>
     <div id="invPac"></div>
     <div id="invAcqBox">
-      <button class="btn ghost" id="invAcqBtn" style="margin-top:0">+ Registra acquisto / rata PAC</button>
+      <button class="btn ghost" id="invAcqBtn" style="margin-top:0">+ Registra ordine (acquisto, rata PAC o vendita)</button>
       <div id="invAcqForm" hidden>
+        <h2 id="acqTit" style="margin-top:4px">Nuovo ordine</h2>
+        <div class="seg" id="acqTipo" style="margin-bottom:8px"><button data-t="acquisto" class="on">Acquisto</button><button data-t="vendita">Vendita</button></div>
         <div class="field"><label>Data</label><input id="acqData" type="date"></div>
-        <div class="field"><label>Importo €</label><input id="acqImp" inputmode="decimal" placeholder="es. 100"></div>
-        <div class="field"><label>Prezzo quota</label><input id="acqPrezzo" inputmode="decimal" placeholder="prezzo di acquisto"></div>
-        <div class="field"><label>Quote</label><input id="acqQuote" inputmode="decimal" placeholder="opzionale: calcolate dal prezzo"></div>
-        <button class="btn" id="acqSave">Salva acquisto</button>
+        <div class="field"><label>Prezzo quota</label><input id="acqPrezzo" inputmode="decimal" placeholder="es. 10,59"></div>
+        <div class="field"><label>Quote</label><input id="acqQuote" inputmode="decimal" placeholder="es. 282,106"></div>
+        <div class="field"><label>Commissioni €</label><input id="acqComm" inputmode="decimal" placeholder="0"></div>
+        <div class="field"><label id="acqImpLbl">Totale pagato €</label><input id="acqImp" inputmode="decimal" placeholder="calcolato da solo"></div>
+        <div class="field"><label>Note</label><input id="acqNote" placeholder="facoltative"></div>
+        <div id="acqCalc" style="font-size:12px;color:var(--muted);margin:-2px 4px 8px"></div>
+        <button class="btn" id="acqSave">Salva ordine</button>
+        <button class="btn danger" id="acqDel" hidden>Elimina ordine</button>
       </div>
     </div>
   </div>
@@ -797,25 +803,29 @@ const isPrev = i => ('gruppo' in i) ? /previdenz|pension/i.test(i.gruppo||'') : 
 const prevTot = d => (d.investimenti||[]).filter(isPrev).reduce((s,i)=>s+(+i.valore||0),0);
 const invByName = n => (S.dash&&S.dash.investimenti||[]).find(x=>x.nome===n);
 
-/* scheda investimento: riepilogo PAC / acquisti */
+/* scheda investimento: riepilogo ordini (acquisti, rate PAC, vendite) */
 function pacHtml(i){
   const p=i.pac; if(!p) return '';
   const st=(l,v,cls='')=>`<div><div class="l">${l}</div><div class="v ${cls}">${v}</div></div>`;
   const ann = p.annualizzato==null ? '<span style="color:var(--muted);font-weight:500">dopo il 1° mese</span>'
     : `${p.annualizzato>=0?'+':''}${nf(p.annualizzato,2)}%`;
   const giorni=(Date.now()-new Date(p.primo+'T12:00'))/864e5;
+  const vend=a=>a.tipo==='vendita'||a.quote<0;
   return `<div class="card" style="margin-bottom:8px">
     <div class="grid2">
-      ${st('Versato',cap(p.versato))}${st('Valore oggi',cap(i.valore))}
+      ${st(p.realizzato!=null?'Versato (quote rimaste)':'Versato',cap(p.versato))}${st('Valore oggi',cap(i.valore))}
       ${st('Quote',nf(p.quote,3,true))}${st('Prezzo medio di carico',p.prezzoMedio?eur(p.prezzoMedio,3):'—')}
       ${st('Rendimento',i.rendimento!=null?(i.rendimento>=0?'+':'')+nf(i.rendimento,2)+'%':'—',i.rendimento>=0?'pos':'neg')}
       ${st('Annualizzato',ann,p.annualizzato==null?'':p.annualizzato>=0?'pos':'neg')}
+      ${p.realizzato!=null?st('Guadagno realizzato',S.priv?MASK:(p.realizzato>=0?'+':'')+eur(p.realizzato),p.realizzato>=0?'pos':'neg'):''}
     </div>
     ${p.annualizzato!=null&&giorni<365?'<div class="minihead">Annualizzato su meno di un anno: indicativo, si stabilizza col tempo.</div>':''}
-    <div class="minihead">${p.n} acquist${p.n>1?'i':'o'} dal ${dIt(p.primo)}</div>
-    <div class="list">${p.acquisti.slice(0,24).map(a=>`<div class="it" style="padding:8px 0"><div class="mid"><div class="t" style="font-size:14px">${dIt(a.data)} · ${cap(a.importo)}</div>
-      <div class="s">${nf(a.quote,3,true)} quote × ${eur(a.prezzo,3)}${a.note?' · '+esc(a.note):''}</div></div>
-      <button class="xdel" data-acqdel="${esc(a.id)}" aria-label="Elimina">✕</button></div>`).join('')}</div>
+    ${p.realizzato!=null?'<div class="minihead">Il versato è il costo delle quote che hai ancora (metodo del costo medio); quello che hai guadagnato con le vendite è nel "realizzato".</div>':''}
+    <div class="minihead">${p.n} ordin${p.n>1?'i':'e'} dal ${dIt(p.primo)} · tocca un ordine per modificarlo</div>
+    <div class="list">${p.acquisti.slice(0,36).map(a=>`<div class="it" style="padding:8px 0;cursor:pointer" data-ordedit="${esc(a.id)}"><div class="mid">
+      <div class="t" style="font-size:14px">${dIt(a.data)} · <span class="${vend(a)?'neg':''}">${vend(a)?'Vendita':'Acquisto'}</span> · ${cap(Math.abs(a.importo))}</div>
+      <div class="s">${nf(Math.abs(a.quote),3,true)} quote × ${eur(a.prezzo,3)}${a.commissioni?' · commissioni '+eur(a.commissioni):''}${a.note?' · '+esc(a.note):''}</div></div>
+      <span style="color:var(--muted);font-size:18px;padding:0 6px">›</span></div>`).join('')}</div>
   </div>`;
 }
 let invCur=null;
@@ -837,18 +847,45 @@ function openInv(i){
   $('invPaesiNota').textContent=!v2?'Disponibile con il motore collegato.':espNota(rp)||'Peso di ogni paese sul titolo. Se la somma è sotto 100, il resto va in "Altri".';
   openSheet('sheetInv');
 }
-$('invAcqBtn').onclick=()=>{ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true; $('acqData').value=today();
-  $('acqImp').value=''; $('acqQuote').value=''; $('acqPrezzo').value=invCur&&invCur.prezzo?String(invCur.prezzo).replace('.',','):''; setTimeout(()=>$('acqImp').focus(),100); };
+/* ordini: nuovo o modifica */
+let ORD={id:null,tipo:'acquisto'};
+function setOrdTipo(t){ ORD.tipo=t; [...$('acqTipo').children].forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  $('acqImpLbl').textContent=t==='vendita'?'Totale incassato €':'Totale pagato €'; calcOrd(); }
+$('acqTipo').onclick=e=>{ const b=e.target.closest('[data-t]'); if(b) setOrdTipo(b.dataset.t); };
+function calcOrd(){ const pr=parseNum($('acqPrezzo').value), q=parseNum($('acqQuote').value), c=parseNum($('acqComm').value), v=ORD.tipo==='vendita';
+  $('acqImp').placeholder = pr&&q ? nf(v?q*pr-c:q*pr+c,2)+' (calcolato)' : 'calcolato da solo';
+  $('acqCalc').textContent = pr&&q ? `${nf(q,3,true)} × ${nf(pr,3,true)} ${v?'−':'+'} ${nf(c,2)} commissioni = ${nf(v?q*pr-c:q*pr+c,2)} €` : 'Inserisci prezzo e quote: il totale si calcola da solo. Oppure prezzo e totale, e calcolo le quote.'; }
+['acqPrezzo','acqQuote','acqComm'].forEach(id=>$(id).addEventListener('input',calcOrd));
+function apriOrd(a){ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true;
+  const fx=n=>n?String(Math.round(Math.abs(n)*1e6)/1e6).replace('.',','):'';
+  ORD.id=a?a.id:null; $('acqTit').textContent=a?'Modifica ordine':'Nuovo ordine'; $('acqDel').hidden=!a; $('acqSave').textContent=a?'Salva modifiche':'Salva ordine';
+  $('acqData').value=a?a.data:today(); $('acqPrezzo').value=a?fx(a.prezzo):(invCur&&invCur.prezzo?String(invCur.prezzo).replace('.',','):'');
+  $('acqQuote').value=a?fx(a.quote):''; $('acqComm').value=a?fx(a.commissioni):'';
+  // il totale resta vuoto (= calcolato) se coincide con quote × prezzo ± commissioni, così modificando il prezzo si aggiorna da solo
+  const calc=a?Math.abs(a.quote)*a.prezzo+((a.tipo==='vendita'||a.quote<0)?-1:1)*(a.commissioni||0):0;
+  $('acqImp').value=a&&Math.abs(Math.abs(a.importo)-calc)>0.02?String(Math.round(Math.abs(a.importo)*100)/100).replace('.',','):''; $('acqNote').value=a?a.note||'':'';
+  setOrdTipo(a&&(a.tipo==='vendita'||a.quote<0)?'vendita':'acquisto');
+  setTimeout(()=>$('invAcqForm').scrollIntoView({behavior:'smooth',block:'start'}),50); }
+$('invAcqBtn').onclick=()=>apriOrd(null);
 $('acqSave').onclick=async()=>{
-  const b={nome:invCur.nome,data:$('acqData').value||today(),importo:parseNum($('acqImp').value),prezzo:parseNum($('acqPrezzo').value)||undefined,quote:parseNum($('acqQuote').value)||undefined};
-  if(!b.importo){ toast('Inserisci l\'importo'); return; }
-  if(!b.prezzo&&!b.quote){ toast('Serve il prezzo o le quote'); return; }
+  const b={nome:invCur.nome,tipo:ORD.tipo,data:$('acqData').value||today(),prezzo:parseNum($('acqPrezzo').value)||undefined,quote:parseNum($('acqQuote').value)||undefined,
+    commissioni:parseNum($('acqComm').value)||0,importo:parseNum($('acqImp').value)||undefined,note:$('acqNote').value.trim()};
+  if(!b.quote&&!(b.prezzo&&b.importo)){ toast('Servono prezzo e quote (oppure prezzo e totale)'); return; }
+  if(!b.prezzo&&!b.importo){ toast('Serve il prezzo o il totale'); return; }
   closeSheets();
-  try{ await api('addAcquisto',{},b); toast('Acquisto registrato ✓'); load(); }catch(e){ toast('Errore: '+e.message); }
+  try{
+    if(ORD.id) await api('updateOrdine',{},{...b,id:ORD.id,importo:b.importo===undefined?'':b.importo});
+    else await api('addOrdine',{},b);
+    toast(ORD.id?'Ordine modificato ✓':'Ordine registrato ✓'); load();
+  }catch(e){
+    if(!ORD.id && b.tipo==='acquisto' && /azione|action|sconosc|unknown/i.test(e.message)){ // motore senza Ordini: vecchio metodo
+      try{ await api('addAcquisto',{},{nome:b.nome,data:b.data,importo:b.importo||(b.quote*b.prezzo+b.commissioni),prezzo:b.prezzo,quote:b.quote}); toast('Acquisto registrato ✓'); load(); return; }catch(e2){ e=e2; } }
+    toast(/azione|action|sconosc|unknown/i.test(e.message)?'Aggiungi il file Ordini al motore':'Errore: '+e.message); }
 };
-$('invPac').onclick=async e=>{ const b=e.target.closest('[data-acqdel]'); if(!b) return;
-  if(!confirm('Eliminare questo acquisto?')) return; closeSheets();
-  try{ await api('deleteAcquisto',{},{id:b.dataset.acqdel}); toast('Eliminato'); load(); }catch(err){ toast('Errore: '+err.message); } };
+$('acqDel').onclick=async()=>{ if(!ORD.id||!confirm('Eliminare questo ordine?')) return; closeSheets();
+  try{ await api('deleteAcquisto',{},{id:ORD.id}); toast('Eliminato'); load(); }catch(err){ toast('Errore: '+err.message); } };
+$('invPac').onclick=e=>{ const r=e.target.closest('[data-ordedit]'); if(!r||!invCur||!invCur.pac) return;
+  const a=invCur.pac.acquisti.find(x=>String(x.id)===r.dataset.ordedit); if(a) apriOrd(a); };
 $('invDel').onclick=async()=>{ const i=invCur; if(!i) return; const acq=(i.pac&&i.pac.acquisti)||[];
   if(!confirm('Eliminare "'+i.nome+'" dal foglio?'+(acq.length?'\nVerranno eliminati anche i suoi '+acq.length+' acquist'+(acq.length>1?'i':'o')+' registrat'+(acq.length>1?'i':'o')+'.':''))) return; closeSheets();
   try{ if(acq.length){ toast('Elimino gli acquisti…'); for(const a of acq) await api('deleteAcquisto',{},{id:a.id}); }
@@ -1388,10 +1425,11 @@ function xirrJs(fl){ if(fl.length<2) return null; fl=[...fl].sort((a,b)=>a.d-b.d
   for(let k=0;k<200;k++){ const m=(lo+hi)/2,fm=npv(m); if(Math.abs(fm)<1e-7) return m; if(flo*fm<0) hi=m; else {lo=m;flo=fm;} } return (lo+hi)/2; }
 function demoInv(i){
   const o={...i}; delete o.acq;
-  if(i.acq&&i.acq.length){ const l=[...i.acq].sort((a,b)=>a.data<b.data?-1:1), q=l.reduce((s,a)=>s+a.quote,0), v=l.reduce((s,a)=>s+a.importo,0);
+  if(i.acq&&i.acq.length){ const l=[...i.acq].sort((a,b)=>a.data<b.data?-1:1); let q=0,v=0,real=0,nv=0;
+    l.forEach(a=>{ if(a.quote<0){ const qv=-a.quote, m=q?v/q:0; v-=m*qv; q-=qv; real+=Math.abs(a.importo)-m*qv; nv++; } else { q+=a.quote; v+=a.importo; } });
     o.quote=q; o.versato=v; o.valore=q*i.prezzo;
     const x=xirrJs([...l.map(a=>({d:new Date(a.data+'T12:00'),v:-a.importo})),{d:new Date(),v:o.valore}]);
-    o.pac={n:l.length,quote:q,versato:v,prezzoMedio:v/q,primo:l[0].data,ultimo:l[l.length-1].data,annualizzato:x==null?null:Math.round(x*10000)/100,acquisti:[...l].reverse()}; }
+    o.pac={n:l.length,quote:q,versato:v,prezzoMedio:q?v/q:null,realizzato:nv?real:null,primo:l[0].data,ultimo:l[l.length-1].data,annualizzato:x==null?null:Math.round(x*10000)/100,acquisti:[...l].reverse().map(a=>({...a,tipo:a.quote<0?'vendita':'acquisto'}))}; }
   else if(i.quote&&i.prezzo) o.valore=i.quote*i.prezzo;
   o.rendimento=o.versato?Math.round((o.valore-o.versato)/o.versato*10000)/100:null;
   return o;
@@ -1418,6 +1456,12 @@ function demoApi(action, params, body){
     for(let g=giorni;g>=0;g-=passo){ seed=(seed*9301+49297)%233280; p*=1+((seed/233280)-.47)*.012*Math.sqrt(passo); out.push({d:new Date(Date.now()-g*864e5).toISOString().slice(0,10),p:Math.round(p*1000)/1000}); }
     const k=(i.prezzo||100)/out[out.length-1].p; out.forEach(x=>x.p=Math.round(x.p*k*1000)/1000);
     return new Promise(r=>setTimeout(()=>r(i.codice?{prezzi:out,valori:[]}:{prezzi:[],valori:out.map(x=>({d:x.d,v:x.p/(i.prezzo||100)*i.valore}))}),300)); }
+  if(action==='addOrdine'||action==='updateOrdine'){ const v=String(body.tipo).startsWith('vend'), pr=+body.prezzo||0, c=+body.commissioni||0;
+    let q=+body.quote||0, imp=+body.importo||0; if(!q&&imp&&pr) q=v?(imp+c)/pr:(imp-c)/pr; if(!imp) imp=v?q*pr-c:q*pr+c;
+    const rec={data:body.data,importo:v?-imp:imp,prezzo:pr||imp/q,quote:v?-q:q,commissioni:c,note:body.note||''};
+    if(action==='addOrdine'){ const i=INV(body.nome); i.acq=i.acq||[]; i.acq.push({id:'a'+Date.now(),...rec}); }
+    else demo.inv.forEach(i=>(i.acq||[]).forEach(a=>{ if(a.id===body.id) Object.assign(a,rec); }));
+    return Promise.resolve({}); }
   if(action==='deleteAcquisto'){ demo.inv.forEach(i=>{ if(i.acq) i.acq=i.acq.filter(a=>a.id!==body.id); }); return Promise.resolve({}); }
   if(action==='addInvestimento'){ if(demo.inv.some(x=>x.nome===body.nome)) return Promise.reject(new Error('Esiste già')); demo.inv.push({nome:body.nome,gruppo:body.gruppo||'',codice:body.codice||'',quote:0,prezzo:body.codice?50:0,valore:0,versato:0,aggiornato:today(),classe:body.classe||null,dataPrezzo:body.codice?today():''}); return Promise.resolve({}); }
   if(action==='deleteInvestimento'){ demo.inv=demo.inv.filter(x=>x.nome!==body.nome); return Promise.resolve({}); }
@@ -1437,7 +1481,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='21 · 19/11 19:35';
+const VERSIONE='22 · 19/11 20:45';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
