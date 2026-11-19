@@ -1115,17 +1115,20 @@ function drawPat(){
   const grid=[0,.5,1].map(f=>{const v=mx-(mx-mn)*f, y=Y(v);return `<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)" stroke-dasharray="3 4"/><text x="${W}" y="${y-3}" text-anchor="end" font-size="10" fill="var(--muted)">${S.priv?'':nf(Math.round(v/1000),0)+'k'}</text>`;}).join('');
   const step=Math.max(1,Math.round(pts.length/5));
   const xl=pts.map((p,i)=>(i%step===0||i===pts.length-1)&&i!==pts.length-2?`<text x="${X(i)}" y="${H-6}" text-anchor="${i===0?'start':i===pts.length-1?'end':'middle'}" font-size="10" fill="var(--muted)">${meseLbl(p.mese)}</text>`:'').join('');
+  // colore di tutto il grafico: verde se questo mese è sopra (o pari) al mese scorso, rosso se è sotto
+  const col=a1&&last.valore<a1.valore?'var(--neg)':'var(--brand)';
   $('pChart').innerHTML=`<div class="tip" id="pTip"></div><svg viewBox="0 0 ${W} ${H}" id="pSvg">
-    <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--brand)" stop-opacity=".35"/><stop offset="1" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
-    ${grid}<path d="${area}" fill="url(#g1)"/><path d="${line}" fill="none" stroke="var(--brand)" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
-    ${xl}<line id="pCur" y1="${pt}" y2="${H-pb}" stroke="var(--muted)" stroke-width="1" style="display:none"/><circle id="pDot" r="4.5" fill="var(--brand)" stroke="var(--card)" stroke-width="2" style="display:none"/>
+    <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".35"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    ${grid}<path d="${area}" fill="url(#g1)"/><path d="${line}" fill="none" stroke="${col}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
+    ${xl}<line id="pCur" y1="${pt}" y2="${H-pb}" stroke="var(--muted)" stroke-width="1" style="display:none"/><circle id="pDot" r="4.5" fill="${col}" stroke="var(--card)" stroke-width="2" style="display:none"/>
     <rect x="0" y="0" width="${W}" height="${H}" fill="transparent" id="pHit"/></svg>`;
   const svg=$('pSvg'), tip=$('pTip');
   const show=ev=>{const r=svg.getBoundingClientRect(); const cx=((ev.touches?ev.touches[0].clientX:ev.clientX)-r.left)*W/r.width;
     const i=Math.max(0,Math.min(pts.length-1,Math.round((cx-pl)/((W-pl-pr)/Math.max(1,pts.length-1))))); const p=pts[i];
     $('pCur').setAttribute('x1',X(i));$('pCur').setAttribute('x2',X(i));$('pCur').style.display='';
     $('pDot').setAttribute('cx',X(i));$('pDot').setAttribute('cy',Y(p.valore));$('pDot').style.display='';
-    tip.style.display='block'; tip.style.left=Math.max(50,Math.min(r.width-50,X(i)*r.width/W))+'px'; tip.textContent=meseLbl(p.mese)+' · '+cap(p.valore,eur0);};
+    const dm=i>0?p.valore-pts[i-1].valore:null;
+    tip.style.display='block'; tip.style.left=Math.max(50,Math.min(r.width-50,X(i)*r.width/W))+'px'; tip.textContent=meseLbl(p.mese)+' · '+cap(p.valore,eur0)+(dm!=null&&!S.priv?' ('+segno(dm)+')':'');};
   const hide=()=>{tip.style.display='none';$('pCur').style.display='none';$('pDot').style.display='none';};
   svg.addEventListener('pointermove',show); svg.addEventListener('touchmove',e=>{show(e);e.preventDefault();},{passive:false}); svg.addEventListener('pointerleave',hide); svg.addEventListener('touchend',()=>setTimeout(hide,1200));
   // composizione
@@ -1252,7 +1255,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='14 · 15/11 22:30';
+const VERSIONE='15 · 19/11 17:50';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
