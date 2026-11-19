@@ -310,6 +310,7 @@ h1{padding-right:52px}
   <div class="card paesi">
     <div class="periods" id="pEspTab"><button data-k="Paesi" class="on">Paesi</button><button data-k="Settori">Settori</button></div>
     <div id="pPaesi"><div class="empty">Caricamento…</div></div>
+    <button class="btn" id="espAgg" style="margin-top:12px;background:var(--card);color:var(--brand);border:1px solid var(--line)">Aggiorna da internet</button>
   </div>
   <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
@@ -831,8 +832,8 @@ function openInv(i){
   const c=compOf(i); setTipo(tipoDaComp(c),c);
   const rp=paesiOf(i); $('invPaesi').value=rp?fmtPaesi(rp.p):''; $('invPaesi').dataset.orig=$('invPaesi').value; $('invPaesi').disabled=!v2;
   const rs=espOf(i,'Settori'); $('invSettori').value=rs?fmtPaesi(rs.p):''; $('invSettori').dataset.orig=$('invSettori').value; $('invSettori').disabled=!v2;
-  $('invSettoriNota').textContent=!v2?'':rs&&rs.stima?'Stima automatica: controlla la scheda del fondo e correggi se serve.':'';
-  $('invPaesiNota').textContent=!v2?'Disponibile con il motore collegato.':rp&&rp.stima?'Stima automatica: controlla la scheda del fondo e correggi se serve.':'Peso di ogni paese sul titolo. Se la somma è sotto 100, il resto va in "Altri".';
+  $('invSettoriNota').textContent=!v2?'':espNota(rs);
+  $('invPaesiNota').textContent=!v2?'Disponibile con il motore collegato.':espNota(rp)||'Peso di ogni paese sul titolo. Se la somma è sotto 100, il resto va in "Altri".';
   openSheet('sheetInv');
 }
 $('invAcqBtn').onclick=()=>{ $('invAcqForm').hidden=false; $('invAcqBtn').hidden=true; $('acqData').value=today();
@@ -1050,9 +1051,11 @@ function guessSettori(i){ const c=String(i.codice||'').toUpperCase(); if(S_ISIN[
   if(/energy|energia|oil/.test(n)) return {Energia:100};
   if(/real estate|reit|immobil/.test(n)) return {Immobiliare:100};
   return null; }
-const espOf=(i,k)=>{ const t=i.campi&&i.campi[k]; const o=t?parsePaesi(t):null; if(o) return {p:o}; const g=k==='Settori'?guessSettori(i):guessPaesi(i); return g?{p:g,stima:true}:null; };
+const espOf=(i,k)=>{ const c=i.campi||{}, t=c[k]; const o=t?parsePaesi(t):null; if(o) return {p:o};
+  const a=c[k+' auto']?parsePaesi(c[k+' auto']):null; if(a) return {p:a,auto:String(c['Esposizione fonte']||'').replace(/(\d{4})-(\d{2})-(\d{2})/,'$3/$2/$1')}; const g=k==='Settori'?guessSettori(i):guessPaesi(i); return g?{p:g,stima:true}:null; };
 const paesiOf=i=>espOf(i,'Paesi');
 let ESP='Paesi';
+const espNota=r=>!r?'':r.auto?'Letto da internet ('+r.auto+'). Se lo modifichi vale il tuo; per tornare al dato automatico svuota il campo.':r.stima?'Stima: il dato vero arriva da internet col prossimo aggiornamento del motore. Puoi correggerlo a mano.':'Inserito da te. Svuota il campo per usare il dato automatico.';
 function renderPaesi(){
   const d=S.dash, box=$('pPaesi'); if(!box) return;
   if(!d||!d.investimenti){ box.innerHTML='<div class="empty">Caricamento…</div>'; return; }
@@ -1066,12 +1069,15 @@ function renderPaesi(){
   if(altri>0.005) rows.push(['Altri',altri]);
   const max=Math.max(...rows.map(r=>r[1]));
   const note=[];
-  if(stime) note.push(`${stime} titol${stime>1?'i':'o'} con ripartizione stimata: controlla la scheda del fondo e correggila dalla matita.`);
+  if(stime) note.push(`${stime} titol${stime>1?'i':'o'} con ripartizione stimata (non ancora letta da internet): controlla la scheda del fondo e correggila dalla matita.`);
   if(nc) note.push(`${nc} titol${nc>1?'i':'o'} senza ${ESP.toLowerCase()}${S.priv?'':' ('+eur0(ncV)+')'}, esclus${nc>1?'i':'o'}.`);
   note.push('Solo investimenti, senza liquidità e previdenza.');
   box.innerHTML=rows.map(([k,v])=>`<div class="pr"><span>${esc(k)}</span><b>${S.priv?'':eur0(v)+' · '}${nf(v/somma*100,1)}%</b><div class="bar"><i style="width:${v/max*100}%;${k==='Altri'?'background:var(--muted)':''}"></i></div></div>`).join('')+`<div class="note">${note.join(' ')}</div>`;
 }
 
+$('espAgg').onclick=async()=>{ if(DEMO()){ toast('In modalità demo non c\'è il motore'); return; } toast('Leggo i dati dei fondi… può volerci un minuto');
+  try{ const r=await api('aggiornaEsposizione',{},{}); const ok=r.filter(x=>x.ok).length, ko=r.length-ok; toast(ok+' aggiornat'+(ok===1?'o':'i')+(ko?' · '+ko+' non trovat'+(ko===1?'o':'i'):'')+' ✓'); load(); }
+  catch(e){ toast(/Azione|action|sconosciut|unknown/i.test(e.message)?'Prima aggiungi il file Esposizione al motore':'Errore: '+e.message); } };
 $('pEspTab').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; ESP=b.dataset.k; [...$('pEspTab').children].forEach(x=>x.classList.toggle('on',x===b)); renderPaesi(); };
 
 /* ================== Obiettivo ================== */
@@ -1236,7 +1242,8 @@ $('invSave').onclick=async()=>{
   closeSheets(); renderInv();
   if(Object.keys(body).length===1){ toast('Salvato ✓'); return; }
   try{ await api('updateInvestimento',{},body);
-    if(codNuovo && cod){ toast('Cerco il prezzo…'); const r=await api('aggiornaPrezzi',{},{nome:i.nome}); toast(r[0]&&r[0].ok?'Prezzo trovato ✓':'ISIN salvato, prezzo non trovato'); }
+    if(codNuovo && cod){ toast('Cerco il prezzo…'); const r=await api('aggiornaPrezzi',{},{nome:i.nome}); toast(r[0]&&r[0].ok?'Prezzo trovato ✓':'ISIN salvato, prezzo non trovato');
+      api('aggiornaEsposizione',{},{nome:i.nome}).then(()=>load()).catch(()=>{}); }
     else toast('Aggiornato ✓');
     load(); }catch(e){ toast('Errore: '+e.message); }
 };
@@ -1413,7 +1420,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='18 · 19/11 18:30';
+const VERSIONE='19 · 19/11 18:50';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
