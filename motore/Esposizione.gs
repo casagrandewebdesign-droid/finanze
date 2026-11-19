@@ -119,10 +119,17 @@ function espFT_(isin) {
     });
   } catch (e) { }
   ['EUR', 'USD', 'GBP'].forEach(v => pagine.push('https://markets.ft.com/data/funds/tearsheet/holdings?s=' + isin + ':' + v));
+  // per ogni simbolo: "holdings" ha i settori, "summary" ha le regioni (Top 5 regions)
+  const out = {};
   for (const u of pagine) {
-    let html; try { html = scarica_(u); } catch (e) { continue; }
-    const t = leggiTabelle_(html);
-    if (t.Paesi || t.Settori) return { ...t, fonte: 'FT' };
+    for (const pag of [u, u.replace('/holdings?', '/summary?')]) {
+      if (out.Paesi && out.Settori) break;
+      let html; try { html = scarica_(pag); } catch (e) { continue; }
+      const t = leggiTabelle_(html);
+      if (t.Paesi && !out.Paesi) out.Paesi = t.Paesi;
+      if (t.Settori && !out.Settori) out.Settori = t.Settori;
+    }
+    if (out.Paesi || out.Settori) return { ...out, fonte: 'FT' };
   }
   return null;
 }
@@ -195,21 +202,11 @@ function testEsposizione() {
   });
 }
 
-/** Diagnostica: mostra cosa rispondono le pagine per un ISIN (titoli trovati), senza scrivere nulla. */
+/** Diagnostica: mostra il pezzo di pagina FT con le regioni, senza scrivere nulla. */
 function debugEsposizione() {
   const isin = 'LU0408877842';
-  const vedi = (u) => {
-    try {
-      const r = UrlFetchApp.fetch(u, { headers: UA_, muteHttpExceptions: true, followRedirects: true });
-      const h = r.getContentText();
-      const tit = (h.match(/<(h[1-6]|caption|th)\b[^>]*>[\s\S]*?<\/\1>/gi) || []).map(testo_).filter(Boolean).slice(0, 40);
-      console.log(u + '\n  codice ' + r.getResponseCode() + ' · ' + h.length + ' caratteri · title: ' + testo_((h.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || '')
-        + '\n  titoli: ' + JSON.stringify(tit)
-        + '\n  "%" trovati: ' + (h.match(/\d+[.,]\d+\s*%/g) || []).slice(0, 15).join(' '));
-    } catch (e) { console.log(u + ' → ERRORE ' + e.message); }
-  };
-  try { console.log('Ricerca FT: ' + scarica_('https://markets.ft.com/data/searchapi/searchsecurities?query=' + isin).slice(0, 600)); }
-  catch (e) { console.log('Ricerca FT → ERRORE ' + e.message); }
-  vedi('https://markets.ft.com/data/funds/tearsheet/holdings?s=' + isin + ':EUR');
-  vedi('https://markets.ft.com/data/funds/tearsheet/summary?s=' + isin + ':EUR');
+  const h = scarica_('https://markets.ft.com/data/funds/tearsheet/summary?s=' + isin + ':EUR');
+  const i = h.indexOf('Top 5 regions');
+  console.log(i < 0 ? 'Top 5 regions non trovato' : h.slice(Math.max(0, i - 300), i + 2500));
+  console.log('Letto: ' + JSON.stringify(leggiTabelle_(h)));
 }
