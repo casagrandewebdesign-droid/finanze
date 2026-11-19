@@ -39,13 +39,13 @@ const ESP_NOMI = {
   'brazil': 'Brasile', 'belgium': 'Belgio', 'finland': 'Finlandia', 'norway': 'Norvegia', 'austria': 'Austria', 'portugal': 'Portogallo',
   'singapore': 'Singapore', 'mexico': 'Messico', 'luxembourg': 'Lussemburgo', 'israel': 'Israele', 'south africa': 'Sudafrica',
   // settori
-  'technology': 'Tecnologia', 'information technology': 'Tecnologia', 'tecnologia': 'Tecnologia', 'tecnologia dell\'informazione': 'Tecnologia', 'it/tecnologia': 'Tecnologia',
+  'technology': 'Tecnologia', 'informatica': 'Tecnologia', 'it': 'Tecnologia', 'information technology': 'Tecnologia', 'tecnologia': 'Tecnologia', 'tecnologia dell\'informazione': 'Tecnologia', 'it/tecnologia': 'Tecnologia',
   'financial services': 'Finanza', 'financials': 'Finanza', 'finance': 'Finanza', 'servizi finanziari': 'Finanza', 'finanza': 'Finanza', 'finanziari': 'Finanza',
   'healthcare': 'Salute', 'health care': 'Salute', 'sanità': 'Salute', 'salute': 'Salute', 'assistenza sanitaria': 'Salute',
   'industrials': 'Industria', 'industria': 'Industria', 'industriali': 'Industria', 'beni industriali': 'Industria',
-  'consumer cyclical': 'Beni voluttuari', 'consumer discretionary': 'Beni voluttuari', 'beni voluttuari': 'Beni voluttuari', 'beni di consumo ciclici': 'Beni voluttuari', 'consumi discrezionali': 'Beni voluttuari',
+  'consumer cyclical': 'Beni voluttuari', 'beni di consumo voluttuari': 'Beni voluttuari', 'beni di consumo discrezionali': 'Beni voluttuari', 'consumer discretionary': 'Beni voluttuari', 'beni voluttuari': 'Beni voluttuari', 'beni di consumo ciclici': 'Beni voluttuari', 'consumi discrezionali': 'Beni voluttuari',
   'consumer defensive': 'Beni di consumo', 'consumer staples': 'Beni di consumo', 'beni di consumo': 'Beni di consumo', 'beni di prima necessità': 'Beni di consumo', 'beni di consumo non ciclici': 'Beni di consumo',
-  'communication services': 'Comunicazioni', 'telecommunications': 'Comunicazioni', 'telecommunication services': 'Comunicazioni', 'telecomunicazioni': 'Comunicazioni', 'servizi di comunicazione': 'Comunicazioni', 'comunicazioni': 'Comunicazioni',
+  'communication services': 'Comunicazioni', 'telecomunicazione': 'Comunicazioni', 'servizi di telecomunicazione': 'Comunicazioni', 'telecommunications': 'Comunicazioni', 'telecommunication services': 'Comunicazioni', 'telecomunicazioni': 'Comunicazioni', 'servizi di comunicazione': 'Comunicazioni', 'comunicazioni': 'Comunicazioni',
   'energy': 'Energia', 'energia': 'Energia', 'basic materials': 'Materiali', 'materials': 'Materiali', 'materiali': 'Materiali', 'materie prime': 'Materiali',
   'utilities': 'Utility', 'servizi di pubblica utilità': 'Utility', 'servizi pubblici': 'Utility', 'utility': 'Utility',
   'real estate': 'Immobiliare', 'immobiliare': 'Immobiliare', 'immobili': 'Immobiliare',
@@ -202,11 +202,11 @@ function testEsposizione() {
   });
 }
 
-/** Diagnostica: mostra il pezzo di pagina FT con le regioni, senza scrivere nulla. */
+/** Diagnostica: mostra il pezzo di pagina FT con le regioni del fondo obbligazionario, senza scrivere nulla. */
 function debugEsposizione() {
   const isin = 'LU0408877842';
   const h = scarica_('https://markets.ft.com/data/funds/tearsheet/summary?s=' + isin + ':EUR');
   const i = h.indexOf('Top 5 regions');
-  console.log(i < 0 ? 'Top 5 regions non trovato' : h.slice(Math.max(0, i - 300), i + 2500));
+  console.log(i < 0 ? 'Top 5 regions non trovato' : h.slice(Math.max(0, i - 300), i + 3000));
   console.log('Letto: ' + JSON.stringify(leggiTabelle_(h)));
 }
