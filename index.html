@@ -125,6 +125,13 @@ nav button.on{color:var(--brand)}
 .obj .edit{float:right;border:0;background:none;color:var(--brand);font-weight:600;font-size:13px;padding:0}
 .cresc .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.cresc .two .l{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}.cresc .two .v{font-size:17px;font-weight:650}
 .cresc svg{width:100%;height:auto;display:block;margin-top:12px}
+.paesi{--c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100;--c5:#e87ba4;--c6:#008300;--c7:#6250d6;--c8:#e34948;--c0:#a3a9a5;--map0:#e9e6df}
+@media (prefers-color-scheme:dark){.paesi{--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--c5:#d55181;--c6:#0ca30c;--c7:#9085e9;--c8:#e66767;--c0:#5d6762;--map0:#26302c}}
+.paesi .viz{margin:6px 0 4px;position:relative}.paesi .viz svg{width:100%;height:auto;display:block}
+.paesi .vtip{font-size:13px;min-height:20px;text-align:center;color:var(--muted)}.paesi .vtip b{color:var(--ink)}
+.paesi .mappa path{stroke:var(--card);stroke-width:.6;cursor:pointer}.paesi .mappa path.sel{stroke:var(--ink);stroke-width:1.4}
+.paesi .torta path{stroke:var(--card);stroke-width:2;cursor:pointer;transition:transform .2s}
+.paesi .pr .dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:-1px}
 .paesi .pr{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:14px;margin:8px 0}.paesi .pr b{font-variant-numeric:tabular-nums}.paesi .bar{grid-column:1/3;height:6px;border-radius:4px;background:var(--line);overflow:hidden}.paesi .bar i{display:block;height:100%;background:var(--brand);border-radius:4px}.paesi .note{font-size:12px;color:var(--muted);margin-top:10px}
 .alloc .note{font-size:12px;color:var(--muted);margin-top:10px}
 .alloc .chips{margin-top:4px}
@@ -1112,12 +1119,66 @@ function renderPaesi(){
   if(stime) note.push(`${stime} titol${stime>1?'i':'o'} con ripartizione stimata (non ancora letta da internet): controlla la scheda del fondo e correggila dalla matita.`);
   if(nc) note.push(`${nc} titol${nc>1?'i':'o'} senza ${ESP.toLowerCase()}${S.priv?'':' ('+eur0(ncV)+')'}, esclus${nc>1?'i':'o'}.`);
   note.push('Solo investimenti, senza liquidità e previdenza.');
-  box.innerHTML=rows.map(([k,v])=>`<div class="pr"><span>${esc(k)}</span><b>${S.priv?'':eur0(v)+' · '}${nf(v/somma*100,1)}%</b><div class="bar"><i style="width:${v/max*100}%;${k==='Altri'?'background:var(--muted)':''}"></i></div></div>`).join('')+`<div class="note">${note.join(' ')}</div>`;
+  const col=(k,j)=>ESP==='Settori'?(k==='Altri'?'var(--c0)':`var(--c${j+1})`):'';
+  const lista=rows.map(([k,v],j)=>`<div class="pr" data-k="${esc(k)}"><span>${ESP==='Settori'?`<i class="dot" style="background:${col(k,j)}"></i>`:''}${esc(k)}</span><b>${S.priv?'':eur0(v)+' · '}${nf(v/somma*100,1)}%</b><div class="bar"><i style="width:${v/max*100}%;background:${ESP==='Settori'?col(k,j):k==='Altri'?'var(--muted)':'var(--brand)'}"></i></div></div>`).join('');
+  box.innerHTML=`<div class="viz" id="espViz"></div><div class="vtip" id="espTip">Tocca ${ESP==='Paesi'?'un paese':'una fetta'} per i dettagli</div>${lista}<div class="note">${note.join(' ')}</div>`;
+  const pesi={}; Object.entries(tot).forEach(([k,v])=>pesi[k]=v/somma*100);
+  const info=(k)=>{ const v=tot[k]||0; $('espTip').innerHTML=`<b>${esc(k)}</b> · ${nf(v/somma*100,1)}%${S.priv?'':' · '+eur0(v)}`; };
+  if(ESP==='Paesi') disegnaMappa(pesi,info); else disegnaTorta(rows.map(([k,v],j)=>({k,v,p:v/somma*100,c:col(k,j)})),info);
+}
+
+/* ---- cartina del mondo: più è colorato, più pesa ---- */
+const ISO_IT={'USA':'USA','Giappone':'JPN','Regno Unito':'GBR','Canada':'CAN','Francia':'FRA','Germania':'DEU','Svizzera':'CHE','Paesi Bassi':'NLD','Italia':'ITA','Spagna':'ESP',
+  'Cina':'CHN','India':'IND','Taiwan':'TWN','Australia':'AUS','Svezia':'SWE','Danimarca':'DNK','Irlanda':'IRL','Corea del Sud':'KOR','Brasile':'BRA','Belgio':'BEL','Finlandia':'FIN',
+  'Norvegia':'NOR','Austria':'AUT','Portogallo':'PRT','Messico':'MEX','Lussemburgo':'LUX','Israele':'ISR','Sudafrica':'ZAF','Polonia':'POL','Ungheria':'HUN','Lituania':'LTU',
+  'Lettonia':'LVA','Bulgaria':'BGR','Grecia':'GRC','Slovenia':'SVN','Slovacchia':'SVK','Estonia':'EST','Croazia':'HRV','Romania':'ROU','Repubblica Ceca':'CZE','Arabia Saudita':'SAU',
+  'Indonesia':'IDN','Thailandia':'THA','Malesia':'MYS','Turchia':'TUR','Nuova Zelanda':'NZL','Cile':'CHL','Argentina':'ARG','Emirati Arabi Uniti':'ARE','Qatar':'QAT','Kuwait':'KWT',
+  'Filippine':'PHL','Vietnam':'VNM','Colombia':'COL','Perù':'PER','Egitto':'EGY','Russia':'RUS','Islanda':'ISL','Cipro':'CYP'};
+let WORLD=null, MAPZ='mondo';
+async function caricaMondo(){ if(WORLD) return WORLD; const r=await fetch('world.json'); WORLD=await r.json(); return WORLD; }
+async function disegnaMappa(pesi,info){
+  const box=$('espViz'); let w;
+  try{ w=await caricaMondo(); }catch(e){ box.innerHTML='<div class="note" style="margin:0">Cartina non disponibile offline.</div>'; return; }
+  if(!$('espViz')||ESP!=='Paesi') return;
+  const perIso={}, fuori=[]; Object.entries(pesi).forEach(([k,p])=>{ const iso=ISO_IT[k]; if(iso) perIso[iso]={k,p}; else if(k!=='Altri') fuori.push(k); });
+  const max=Math.max(1,...Object.values(perIso).map(x=>x.p));
+  // scala sequenziale: un solo colore, più chiaro → più scuro (radice per far vedere anche i paesi piccoli)
+  const fill=p=>`color-mix(in srgb, var(--brand) ${Math.round(18+82*Math.sqrt(p/max))}%, var(--map0))`;
+  const VB={mondo:`0 8 ${w.w} ${w.h-8}`,europa:'455 25 165 125'};
+  box.innerHTML=`<div class="periods" id="mapZoom" style="margin:0 0 6px"><button data-z="mondo" class="${MAPZ==='mondo'?'on':''}">Mondo</button><button data-z="europa" class="${MAPZ==='europa'?'on':''}">Europa</button></div>
+    <svg class="mappa" viewBox="${VB[MAPZ]}">${w.c.map(c=>{ const x=perIso[c.i]; return `<path d="${c.d}" data-i="${c.i}" fill="${x?fill(x.p):'var(--map0)'}"><title>${esc(x?x.k:c.n)}</title></path>`; }).join('')}</svg>
+    <div style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);justify-content:center;margin-top:4px">0%<span style="width:90px;height:7px;border-radius:4px;background:linear-gradient(90deg,var(--map0),var(--brand))"></span>${nf(max,0)}%</div>
+    ${fuori.length?`<div style="font-size:12px;color:var(--muted);text-align:center;margin-top:4px">Non sulla cartina: ${fuori.map(esc).join(', ')}</div>`:''}`;
+  $('mapZoom').onclick=e=>{ const b=e.target.closest('[data-z]'); if(!b) return; MAPZ=b.dataset.z; box.querySelector('svg').setAttribute('viewBox',VB[MAPZ]);
+    [...$('mapZoom').children].forEach(x=>x.classList.toggle('on',x===b)); };
+  box.querySelector('svg').onclick=e=>{ const p=e.target.closest('path'); if(!p) return; box.querySelectorAll('path.sel').forEach(x=>x.classList.remove('sel')); p.classList.add('sel'); p.parentNode.appendChild(p);
+    const x=perIso[p.dataset.i]; if(x) info(x.k); else $('espTip').innerHTML='<b>'+esc(p.querySelector('title').textContent)+'</b> · 0%'; };
+}
+
+/* ---- torta dei settori con le fette staccate ---- */
+function disegnaTorta(fette,info){
+  const R=92, C=120, H=240, gap=5; let a0=-Math.PI/2;
+  const pt=(a,r,dx=0,dy=0)=>[(C+dx+r*Math.cos(a)).toFixed(1),(C+dy+r*Math.sin(a)).toFixed(1)];
+  const tot=fette.reduce((s,f)=>s+f.v,0)||1;
+  const paths=fette.map((f,j)=>{ const a=f.v/tot*Math.PI*2, a1=a0+a, m=a0+a/2, dx=gap*Math.cos(m), dy=gap*Math.sin(m);
+    const [x0,y0]=pt(a0,R,dx,dy), [x1,y1]=pt(a1,R,dx,dy), [cx,cy]=[(C+dx).toFixed(1),(C+dy).toFixed(1)];
+    const d=fette.length===1?`M${C-R},${C}A${R},${R} 0 1 1 ${C+R},${C}A${R},${R} 0 1 1 ${C-R},${C}Z`:`M${cx},${cy}L${x0},${y0}A${R},${R} 0 ${a>Math.PI?1:0} 1 ${x1},${y1}Z`;
+    const [lx,ly]=pt(m,R*.66,dx,dy);
+    a0=a1;
+    return `<g data-j="${j}" data-dx="${dx.toFixed(1)}" data-dy="${dy.toFixed(1)}"><path d="${d}" fill="${f.c}"><title>${esc(f.k)}</title></path>${f.p>=7?`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="650" fill="#fff" style="pointer-events:none">${nf(f.p,0)}%</text>`:''}</g>`; }).join('');
+  const box=$('espViz');
+  box.innerHTML=`<svg class="torta" viewBox="0 0 ${H} ${H}" style="max-width:260px;margin:0 auto">${paths}</svg>`;
+  box.querySelector('svg').onclick=e=>{ const g=e.target.closest('g[data-j]'); if(!g) return; const j=+g.dataset.j;
+    box.querySelectorAll('g[data-j]').forEach(x=>x.setAttribute('transform', x===g?`translate(${x.dataset.dx*1.8},${x.dataset.dy*1.8})`:''));
+    info(fette[j].k); };
 }
 
 $('espAgg').onclick=async()=>{ if(DEMO()){ toast('In modalità demo non c\'è il motore'); return; } toast('Leggo i dati dei fondi… può volerci un minuto');
   try{ const r=await api('aggiornaEsposizione',{},{}); const ok=r.filter(x=>x.ok).length, ko=r.length-ok; toast(ok+' aggiornat'+(ok===1?'o':'i')+(ko?' · '+ko+' non trovat'+(ko===1?'o':'i'):'')+' ✓'); load(); }
   catch(e){ toast(/Azione|action|sconosciut|unknown/i.test(e.message)?'Prima aggiungi il file Esposizione al motore':'Errore: '+e.message); } };
+$('pPaesi').addEventListener('click',e=>{ const r=e.target.closest('.pr[data-k]'); if(!r) return; const k=r.dataset.k;
+  if(ESP==='Settori'){ const g=[...$('espViz').querySelectorAll('g[data-j]')].find(x=>x.querySelector('title').textContent===k); if(g) g.querySelector('path').dispatchEvent(new MouseEvent('click',{bubbles:true})); }
+  else { const iso=ISO_IT[k], p=iso&&$('espViz').querySelector(`path[data-i="${iso}"]`); if(p) p.dispatchEvent(new MouseEvent('click',{bubbles:true})); else $('espTip').innerHTML='<b>'+esc(k)+'</b> · '+r.querySelector('b').textContent; } });
 $('pEspTab').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; ESP=b.dataset.k; [...$('pEspTab').children].forEach(x=>x.classList.toggle('on',x===b)); renderPaesi(); };
 
 /* ================== Obiettivo ================== */
@@ -1481,7 +1542,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='22 · 19/11 20:45';
+const VERSIONE='23 · 20/11 00:15';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
