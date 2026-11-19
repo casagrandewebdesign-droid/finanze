@@ -569,6 +569,7 @@ async function load(){
     if($('v-mov').classList.contains('on')) renderMov();
     if($('v-cfr').classList.contains('on')) drawCfr();
     // in background: prepara lo storico così la scheda Patrimonio si apre subito
+    syncImpostazioni();
     api('storico').then(st=>{ P.dati=st; LS.set('storico_'+(DEMO()?'demo':'live'),st); if($('v-pat').classList.contains('on')) drawPat(); }).catch(()=>{});
     $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
   }catch(e){
@@ -1108,9 +1109,21 @@ function renderObj(){
 }
 function openObj(){ $('oNome').value=OBJ&&OBJ.nome||''; $('oImp').value=OBJ&&OBJ.importo?String(OBJ.importo).replace('.',','):''; $('oData').value=OBJ&&OBJ.entro||''; $('oDel').hidden=!OBJ; openSheet('sheetObj'); setTimeout(()=>$('oImp').focus(),250); }
 $('pObj').onclick=e=>{ if(e.target.closest('#oNew,#oEdit')) openObj(); };
-$('oSave').onclick=()=>{ const imp=parseNum($('oImp').value); if(!imp){ toast('Inserisci la cifra'); return; }
-  OBJ={nome:$('oNome').value.trim(),importo:imp,entro:$('oData').value||''}; LS.set('obiettivo',OBJ); closeSheets(); renderObj(); toast('Obiettivo salvato ✓'); };
-$('oDel').onclick=()=>{ OBJ=null; LS.set('obiettivo',null); closeSheets(); renderObj(); };
+// l'obiettivo vive nel motore (uguale su tutti i dispositivi); sul telefono ne resta una copia per aprire subito
+async function salvaObj(){ LS.set('obiettivo',OBJ); renderObj();
+  try{ await api('salvaImpostazioni',{},{obiettivo:OBJ||false}); LS.set('objSync',true); return true; }
+  catch(e){ LS.set('objSync',false); return false; } }
+async function syncImpostazioni(){
+  try{ const r=await api('impostazioni',{},{});
+    if(r && 'obiettivo' in r){ OBJ=r.obiettivo||null; LS.set('obiettivo',OBJ); LS.set('objSync',true); }
+    else if(OBJ && !LS.get('objSync',false)) await salvaObj(); // primo avvio: porta nel motore quello salvato su questo dispositivo
+    if($('v-pat').classList.contains('on')) renderObj();
+  }catch(e){}
+}
+$('oSave').onclick=async()=>{ const imp=parseNum($('oImp').value); if(!imp){ toast('Inserisci la cifra'); return; }
+  OBJ={nome:$('oNome').value.trim(),importo:imp,entro:$('oData').value||''}; closeSheets();
+  toast(await salvaObj()?'Obiettivo salvato ✓':'Salvato solo su questo dispositivo: aggiorna il motore'); };
+$('oDel').onclick=async()=>{ OBJ=null; closeSheets(); await salvaObj(); };
 
 /* ================== Da dove viene la crescita ================== */
 // per ogni mese: variazione del patrimonio = risparmio (entrate − uscite) + rendimento degli investimenti (il resto)
@@ -1386,6 +1399,8 @@ function demoInv(i){
 function demoApi(action, params, body){
   const tipoOf=m=>m.tipo||(m.importo>=0?'entrate':'uscite');
   if(action==='config') return Promise.resolve({categorie:demo.categorie,conti:demo.conti});
+  if(action==='impostazioni') return Promise.resolve({...(demo.imp||{})});
+  if(action==='salvaImpostazioni'){ demo.imp={...(demo.imp||{})}; Object.keys(body).forEach(k=>{ if(body[k]===null) delete demo.imp[k]; else demo.imp[k]=body[k]; }); return Promise.resolve(demo.imp); }
   if(action==='movimenti') return Promise.resolve([...demo.movs,...demo.storia].filter(x=>x.data.startsWith(params.mese)).sort((a,b)=>a.data<b.data?1:-1));
   if(action==='addMovimento'){ let imp=Math.abs(body.importo); const tipo=body.tipo||(body.segno==='entrata'?'entrate':'uscite'); if(tipo!=='entrate') imp=-imp;
     demo.movs.push({...body,importo:imp,tipo,id:'d'+Date.now()}); return Promise.resolve({}); }
@@ -1422,7 +1437,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='20 · 19/11 19:20';
+const VERSIONE='21 · 19/11 19:35';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
