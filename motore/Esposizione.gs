@@ -194,3 +194,22 @@ function testEsposizione() {
       + '\n  justETF → ' + (je ? JSON.stringify({ paesi: je.Paesi && fmtEsp_(je.Paesi), settori: je.Settori && fmtEsp_(je.Settori) }) : 'niente'));
   });
 }
+
+/** Diagnostica: mostra cosa rispondono le pagine per un ISIN (titoli trovati), senza scrivere nulla. */
+function debugEsposizione() {
+  const isin = 'LU0408877842';
+  const vedi = (u) => {
+    try {
+      const r = UrlFetchApp.fetch(u, { headers: UA_, muteHttpExceptions: true, followRedirects: true });
+      const h = r.getContentText();
+      const tit = (h.match(/<(h[1-6]|caption|th)\b[^>]*>[\s\S]*?<\/\1>/gi) || []).map(testo_).filter(Boolean).slice(0, 40);
+      console.log(u + '\n  codice ' + r.getResponseCode() + ' · ' + h.length + ' caratteri · title: ' + testo_((h.match(/<title>([\s\S]*?)<\/title>/i) || [])[1] || '')
+        + '\n  titoli: ' + JSON.stringify(tit)
+        + '\n  "%" trovati: ' + (h.match(/\d+[.,]\d+\s*%/g) || []).slice(0, 15).join(' '));
+    } catch (e) { console.log(u + ' → ERRORE ' + e.message); }
+  };
+  try { console.log('Ricerca FT: ' + scarica_('https://markets.ft.com/data/searchapi/searchsecurities?query=' + isin).slice(0, 600)); }
+  catch (e) { console.log('Ricerca FT → ERRORE ' + e.message); }
+  vedi('https://markets.ft.com/data/funds/tearsheet/holdings?s=' + isin + ':EUR');
+  vedi('https://markets.ft.com/data/funds/tearsheet/summary?s=' + isin + ':EUR');
+}
