@@ -828,7 +828,7 @@ function openInv(i){
   $('invQuote').disabled=$('invVers').disabled=!!i.pac;
   $('invQuote').placeholder=$('invVers').placeholder = i.pac ? 'calcolato dagli acquisti' : '';
   if(!i.pac) $('invVers').placeholder='per calcolare il rendimento';
-  $('invDel').hidden = !v2 || !!i.pac;
+  $('invDel').hidden = !v2;
   const c=compOf(i); setTipo(tipoDaComp(c),c);
   const rp=paesiOf(i); $('invPaesi').value=rp?fmtPaesi(rp.p):''; $('invPaesi').dataset.orig=$('invPaesi').value; $('invPaesi').disabled=!v2;
   const rs=espOf(i,'Settori'); $('invSettori').value=rs?fmtPaesi(rs.p):''; $('invSettori').dataset.orig=$('invSettori').value; $('invSettori').disabled=!v2;
@@ -848,8 +848,10 @@ $('acqSave').onclick=async()=>{
 $('invPac').onclick=async e=>{ const b=e.target.closest('[data-acqdel]'); if(!b) return;
   if(!confirm('Eliminare questo acquisto?')) return; closeSheets();
   try{ await api('deleteAcquisto',{},{id:b.dataset.acqdel}); toast('Eliminato'); load(); }catch(err){ toast('Errore: '+err.message); } };
-$('invDel').onclick=async()=>{ if(!invCur||!confirm('Eliminare "'+invCur.nome+'" dal foglio?')) return; closeSheets();
-  try{ await api('deleteInvestimento',{},{nome:invCur.nome}); toast('Eliminato'); load(); }catch(e){ toast('Errore: '+e.message); } };
+$('invDel').onclick=async()=>{ const i=invCur; if(!i) return; const acq=(i.pac&&i.pac.acquisti)||[];
+  if(!confirm('Eliminare "'+i.nome+'" dal foglio?'+(acq.length?'\nVerranno eliminati anche i suoi '+acq.length+' acquist'+(acq.length>1?'i':'o')+' registrat'+(acq.length>1?'i':'o')+'.':''))) return; closeSheets();
+  try{ if(acq.length){ toast('Elimino gli acquisti…'); for(const a of acq) await api('deleteAcquisto',{},{id:a.id}); }
+    await api('deleteInvestimento',{},{nome:i.nome}); toast('Eliminato'); load(); }catch(e){ toast('Errore: '+e.message); load(); } };
 
 /* fondo pensione: versato nel tempo stimato (versamento iniziale + versamenti regolari fino a oggi) */
 function prevInfo(i){
@@ -1420,7 +1422,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='19 · 19/11 18:50';
+const VERSIONE='20 · 19/11 19:20';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
