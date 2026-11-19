@@ -288,11 +288,6 @@ h1{padding-right:52px}
     <div class="comp"><i id="cLiq" style="background:var(--brand)"></i><i id="cInv" style="background:var(--accent)"></i><i id="cPrev" style="background:#b08d57"></i></div>
     <div class="legend"><span><span class="dot" style="background:var(--brand)"></span>Liquidità <b id="cLiqV">—</b></span><span><span class="dot" style="background:var(--accent)"></span>Investimenti <b id="cInvV">—</b></span><span id="cPrevRow" hidden><span class="dot" style="background:#b08d57"></span>Previdenza <b id="cPrevV">—</b></span></div>
   </div>
-  <h2>Esposizione</h2>
-  <div class="card paesi">
-    <div class="periods" id="pEspTab"><button data-k="Paesi" class="on">Paesi</button><button data-k="Settori">Settori</button></div>
-    <div id="pPaesi"><div class="empty">Caricamento…</div></div>
-  </div>
   <h2>Mese per mese</h2>
   <div class="card list" id="pList"></div>
 </section>
@@ -310,6 +305,11 @@ h1{padding-right:52px}
     <div class="comp" id="aBar"></div>
     <div class="legend" id="aLeg"></div>
     <div class="note" id="aNote"></div>
+  </div>
+  <h2>Esposizione</h2>
+  <div class="card paesi">
+    <div class="periods" id="pEspTab"><button data-k="Paesi" class="on">Paesi</button><button data-k="Settori">Settori</button></div>
+    <div id="pPaesi"><div class="empty">Caricamento…</div></div>
   </div>
   <h2>Titoli</h2>
   <div class="card list inv" id="invList"></div>
@@ -1002,7 +1002,7 @@ function guessComp(nome){
 const compOf = i => (S.dash&&S.dash._v2&&i.classe) || S.alloc[i.nome] || i.classe || guessComp(i.nome);
 const compLbl = c => !c ? 'da classificare' : c.az>=99.99?'Azioni':c.ob>=99.99?'Obbligazioni':c.lq>=99.99?'Monetario':[['az','Az.'],['ob','Obbl.'],['lq','Mon.']].filter(([k])=>c[k]>=0.5).map(([k,l])=>l+' '+nf(c[k],0)+'%').join(' · ');
 function renderAlloc(){
-  const d=S.dash; if(!d) return;
+  const d=S.dash; if(!d) return; renderPaesi();
   const tot={az:0,ob:0,lq:0}; let nc=0, ncV=0, stime=0;
   d.investimenti.filter(i=>!isPrev(i)).forEach(i=>{ const c=compOf(i), v=+i.valore||0; if(!v) return;
     if(!c){ nc++; ncV+=v; return; } if(c.stima) stime++;
@@ -1292,7 +1292,7 @@ function drawPat(){
   const pv=S.dash?prevTot(S.dash):0, liq=P.dati.liquidita||0, inv=(P.dati.investimenti||0)-pv, tot=liq+inv+pv||1;
   $('cLiq').style.width=(liq/tot*100)+'%'; $('cInv').style.width=(inv/tot*100)+'%'; $('cPrev').style.width=(pv/tot*100)+'%';
   $('cPrevRow').hidden=!pv; $('cPrevV').textContent=(S.priv?'':eur0(pv)+' · ')+Math.round(pv/tot*100)+'%';
-  renderPaesi(); renderObj(); renderCresc(pts);
+  renderObj(); renderCresc(pts);
   $('cLiqV').textContent=(S.priv?'':eur0(liq)+' · ')+Math.round(liq/tot*100)+'%'; $('cInvV').textContent=(S.priv?'':eur0(inv)+' · ')+Math.round(inv/tot*100)+'%';
   // lista
   $('pList').innerHTML=[...all].reverse().slice(0,36).map((p,i,arr)=>{const prev=arr[i+1]; const dv=prev?p.valore-prev.valore:null;
@@ -1413,7 +1413,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='17 · 19/11 18:45';
+const VERSIONE='18 · 19/11 18:30';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
