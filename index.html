@@ -506,8 +506,9 @@ h1{padding-right:52px}
     <div class="grab"></div>
     <h2 style="margin-top:4px;text-transform:none;font-size:17px;color:var(--ink)">Nuovo titolo</h2>
     <div class="seg" id="niGruppo" style="margin-bottom:6px"><button data-g="" class="on">Titolo</button><button data-g="Previdenza">Fondo pensione</button></div>
+    <div class="field"><label>ISIN / ticker</label><input id="niCod" autocapitalize="characters" placeholder="incolla l'ISIN: il nome arriva da solo"></div>
+    <div class="hint" id="niInfo" style="margin:-2px 0 6px"></div>
     <div class="field"><label>Nome</label><input id="niNome" placeholder="es. ETF MSCI World"></div>
-    <div class="field"><label>ISIN / ticker</label><input id="niCod" autocapitalize="characters" placeholder="per il prezzo automatico"></div>
     <div class="field"><label>Tipo</label><select id="niTipo"><option value="">da decidere</option><option value="az">Azioni</option><option value="ob">Obbligazioni</option><option value="lq">Monetario</option><option value="mix">Misto 50/50</option></select></div>
     <div class="minihead">Primo acquisto (facoltativo)</div>
     <div class="field"><label>Data</label><input id="niData" type="date"></div>
@@ -1011,7 +1012,25 @@ $('btnPrezzi').onclick=async()=>{
 };
 
 /* nuovo investimento */
-function nuovoInv(){ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; setGruppo(''); $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niNome').focus(),250); }
+function nuovoInv(){ ['niNome','niCod','niImp','niPrezzo'].forEach(x=>$(x).value=''); $('niTipo').value=''; $('niInfo').textContent=''; niAuto=''; setGruppo(''); $('niData').value=today(); openSheet('sheetNewInv'); setTimeout(()=>$('niCod').focus(),250); }
+/* nome dall'ISIN: compila il nome solo se è vuoto o se l'aveva messo lui (niAuto) */
+let niAuto='', niCerca=0;
+async function cercaNomeInv(){
+  const c=$('niCod').value.trim().toUpperCase(), n=++niCerca, box=$('niInfo');
+  if(!/^[A-Z]{2}[A-Z0-9]{9}\d$/.test(c) && !/^[A-Z0-9.\-^=]{1,12}$/.test(c)){ box.textContent=''; return; }
+  box.textContent='Cerco il nome…';
+  try{
+    const r=await api('infoTitolo',{codice:c});
+    if(n!==niCerca) return;
+    const nome=$('niNome');
+    if(!nome.value.trim() || nome.value===niAuto){ nome.value=r.nome; niAuto=r.nome; }
+    if(r.tipo==='Azione' && !$('niTipo').value) $('niTipo').value='az';
+    if(r.tipo==='Obbligazione' && !$('niTipo').value) $('niTipo').value='ob';
+    box.textContent='Trovato: '+[r.tipo,r.ticker,r.fonte].filter(Boolean).join(' · ')+' — puoi modificare il nome';
+  }catch(e){ if(n===niCerca) box.textContent='Nome non trovato: scrivilo tu'; }
+}
+$('niCod').addEventListener('change',cercaNomeInv);
+$('niCod').addEventListener('input',()=>{ if(/^[A-Z]{2}[A-Z0-9]{9}\d$/.test($('niCod').value.trim().toUpperCase())) cercaNomeInv(); });
 let niGruppo='';
 function setGruppo(g){ niGruppo=g; [...$('niGruppo').children].forEach(b=>b.classList.toggle('on',b.dataset.g===g)); }
 $('niGruppo').onclick=e=>{ const b=e.target.closest('button'); if(b) setGruppo(b.dataset.g); };
@@ -1552,6 +1571,8 @@ function demoApi(action, params, body){
     return Promise.resolve({}); }
   if(action==='deleteAcquisto'){ demo.inv.forEach(i=>{ if(i.acq) i.acq=i.acq.filter(a=>a.id!==body.id); }); return Promise.resolve({}); }
   if(action==='addInvestimento'){ if(demo.inv.some(x=>x.nome===body.nome)) return Promise.reject(new Error('Esiste già')); demo.inv.push({nome:body.nome,gruppo:body.gruppo||'',codice:body.codice||'',quote:0,prezzo:body.codice?50:0,valore:0,versato:0,aggiornato:today(),classe:body.classe||null,dataPrezzo:body.codice?today():''}); return Promise.resolve({}); }
+  if(action==='infoTitolo'){ const c=String(params.codice||'').toUpperCase(), noti={IE00B4L5Y983:'iShares Core MSCI World UCITS ETF USD (Acc)',IE00BK5BQT80:'Vanguard FTSE All-World UCITS ETF USD Acc',US0378331005:'Apple Inc.'};
+    return new Promise((ok,ko)=>setTimeout(()=>noti[c]?ok({nome:noti[c],tipo:c.startsWith('US')?'Azione':'ETF',ticker:'',fonte:'demo'}):ko(new Error('non trovato')),300)); }
   if(action==='deleteInvestimento'){ demo.inv=demo.inv.filter(x=>x.nome!==body.nome); return Promise.resolve({}); }
   if(action==='storico'){ const pts=[]; const now=new Date(); let v=15000;
     for(let i=47;i>=0;i--){ v=v*(1+(Math.sin(i)*0.012+0.008)); if(i===18) v+=8000; const d=new Date(now.getFullYear(),now.getMonth()-i,1); const ent=1450+(i%4===0?300:0), usc=900+Math.round(Math.abs(Math.sin(i*1.7))*500); pts.push({mese:ym(d),valore:Math.round(v),nota:'',entrate:ent,uscite:usc}); }

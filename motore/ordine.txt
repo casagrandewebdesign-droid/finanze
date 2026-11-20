@@ -9,3 +9,4 @@ Esposizione
 Impostazioni
 Ordini
 Finanziamenti
+Isin
