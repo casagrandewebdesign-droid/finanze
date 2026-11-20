@@ -82,6 +82,12 @@ const remoti = (await call(token, 'GET', API + '/content')).files || [];
 mkdirSync('backup', { recursive: true });
 writeFileSync('backup/progetto-prima-del-deploy.json', JSON.stringify(remoti, null, 2));
 
+// salva nel repo i file che esistono solo nel progetto (es. Codice.gs): così il repo ha sempre tutto il motore
+for (const f of remoti) {
+  const nome = f.name + (f.type === 'SERVER_JS' ? '.gs' : f.type === 'HTML' ? '.html' : '');
+  if (f.type === 'JSON' || existsSync(join(DIR, nome))) continue;
+  writeFileSync(join(DIR, nome), f.source); console.log('Salvato nel repo: motore/' + nome);
+}
 const files = ordina(remoti, fileLocali());
 const cambiati = files.filter(f => f._nuovo || (f._agg && remoti.find(r => r.name === f.name && r.type === f.type).source !== f.source));
 console.log('Ordine dei file nel progetto:');

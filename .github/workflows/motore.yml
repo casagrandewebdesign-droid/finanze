@@ -11,6 +11,7 @@ on:
         description: 'Solo prova (non scrive nulla)'
         type: boolean
         default: false
+permissions: { contents: write }
 concurrency: { group: motore, cancel-in-progress: false }
 jobs:
   deploy:
@@ -29,6 +30,13 @@ jobs:
           DRY_RUN: ${{ inputs.prova && '1' || '' }}
           DESCRIZIONE: ${{ github.event.head_commit.message || 'Deploy manuale' }}
         run: node tools/deploy-motore.mjs
+      - name: Salva nel repo i file presenti solo in Apps Script (es. Codice.gs)
+        run: |
+          git add motore/
+          if ! git diff --cached --quiet; then
+            git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" commit -m "Motore: copia dei file presenti solo in Apps Script"
+            git push
+          fi
       - name: Copia di sicurezza del progetto prima del deploy
         if: always()
         uses: actions/upload-artifact@v4
