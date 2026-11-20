@@ -1435,7 +1435,7 @@ const dataLbl=s=>{ if(!s) return '—'; const [y,m,d]=s.split('-').map(Number); 
 async function renderFin(){
   if(FIN) drawFin();
   try{ FIN=await api('finanziamenti'); LS.set('fin_'+(DEMO()?'demo':'live'),FIN); drawFin(); }
-  catch(e){ if(/azione|action|sconosc|unknown/i.test(e.message)) $('pFinBox').hidden=true; }
+  catch(e){ if(FIN) return; $('pFinBox').hidden=false; $('pFin').innerHTML='<div class="s">'+(/azione|action|sconosc|unknown/i.test(e.message)?'Il motore non conosce ancora i finanziamenti: controlla che il file Finanziamenti sia in fondo all\'elenco e fai "Nuova versione" del deployment.':'Non riesco a caricare i finanziamenti: '+esc(e.message))+'</div>'; }
 }
 function drawFin(){
   const l=(FIN&&FIN.lista||[]).filter(f=>f.attivo); $('pFinBox').hidden=!l.length; if(!l.length) return;
@@ -1569,7 +1569,7 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='24 · 20/11 14:40';
+const VERSIONE='25 · 20/11 14:45';
 try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
