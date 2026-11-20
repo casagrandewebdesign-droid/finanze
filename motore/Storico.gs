@@ -3,6 +3,7 @@
  * - storicoInvestimento: andamento del prezzo da Yahoo Finance (per i titoli con ISIN/ticker)
  *   + i valori registrati nel tempo (tab "Storico investimenti", per tutti, anche il fondo pensione)
  * - ogni aggiornamento dei prezzi o modifica fatta dall'app salva una "foto" del giorno
+ * - per chi non ha un prezzo (es. fondo pensione) la riga si salva solo quando il valore cambia
  */
 const STO = 'Storico investimenti';
 const STO_HEAD = ['Data', 'Investimento', 'Prezzo', 'Quote', 'Valore'];
@@ -28,7 +29,7 @@ function fotografa_(nome) {
   if (!sh) { sh = ss_().insertSheet(STO); sh.getRange(1, 1, 1, STO_HEAD.length).setValues([STO_HEAD]).setFontWeight('bold'); sh.setFrozenRows(1); }
   delete _mem['r_' + SHEETS.INV]; delete _mem['r_' + STO];
   const oggi = ymd_(new Date());
-  const esist = rows_(STO).filter(r => ymd_(r['Data']) === oggi);
+  const tutte = rows_(STO), esist = tutte.filter(r => ymd_(r['Data']) === oggi);
   rows_(SHEETS.INV).forEach(i => {
     if (nome && i['Nome'] !== nome) return;
     const q = num_(i['Quote']), p = num_(i['Prezzo']);
@@ -36,6 +37,11 @@ function fotografa_(nome) {
     if (!v) return;
     const riga = [toDate_(oggi), i['Nome'], p || '', q || '', v];
     const e = esist.find(r => r['Investimento'] === i['Nome']);
+    if (!e && !p) {   // valore inserito a mano: niente riga nuova se è uguale all'ultimo registrato
+      const prec = tutte.filter(r => r['Investimento'] === i['Nome'] && ymd_(r['Data']) < oggi)
+        .sort((a, b) => (ymd_(a['Data']) < ymd_(b['Data']) ? -1 : 1)).pop();
+      if (prec && Math.abs(num_(prec['Valore']) - v) < 0.005) return;
+    }
     if (e) sh.getRange(e._row, 1, 1, riga.length).setValues([riga]);
     else sh.appendRow(riga);
   });
@@ -49,9 +55,15 @@ function storicoInvestimento_(nome, periodo) {
   const per = { '1m': ['1mo', '1d', 31], '6m': ['6mo', '1d', 183], '1a': ['1y', '1d', 366], '5a': ['5y', '1wk', 1827], 'max': ['max', '1mo', 99999] }[periodo || '1a'] || ['1y', '1d', 366];
   const da = ymd_(new Date(Date.now() - per[2] * 864e5));
   // valori registrati (anche per chi non ha un prezzo pubblico)
-  const valori = ss_().getSheetByName(STO) ? rows_(STO).filter(r => r['Investimento'] === nome)
+  const tutti = ss_().getSheetByName(STO) ? rows_(STO).filter(r => r['Investimento'] === nome)
     .map(r => ({ d: ymd_(r['Data']), v: num_(r['Valore']), p: num_(r['Prezzo']) || null }))
-    .filter(x => x.d >= da).sort((a, b) => (a.d < b.d ? -1 : 1)) : [];
+    .sort((a, b) => (a.d < b.d ? -1 : 1)) : [];
+  // senza prezzo (valore a mano): tieni solo i giorni in cui il valore è cambiato
+  const cambi = tutti.filter((x, k) => x.p || !k || tutti[k - 1].p || Math.abs(x.v - tutti[k - 1].v) >= 0.005);
+  const valori = cambi.filter(x => x.d >= da);
+  // punto di partenza del periodo: l'ultimo valore inserito prima dell'inizio
+  const prima = cambi.filter(x => x.d < da).pop();
+  if (prima && !prima.p && (!valori.length || valori[0].d > da)) valori.unshift({ d: da, v: prima.v, p: null });
   // prezzi di mercato da Yahoo
   let prezzi = [], fonte = '', errore = '';
   const cod = String(inv[COL_COD] || '').trim().toUpperCase();
