@@ -7,26 +7,14 @@
  * Versato e prezzo medio seguono il metodo del costo medio: una vendita toglie dal versato
  * la parte di costo delle quote vendute; la differenza è il guadagno "realizzato".
  * Azioni per l'app: addOrdine, updateOrdine (deleteAcquisto resta quella di Prezzi).
- * Non serve eseguire nulla: basta fare "Nuova versione" del deployment.
+ * Si pubblica da solo con il deploy automatico (vedi DEPLOY.md).
  */
 const ORD_EXTRA = ['Tipo', 'Commissioni'];
 
-(function () {
-  if (typeof handle_ === 'function' && !handle_._ord) {
-    const orig = handle_;
-    handle_ = function (p) {
-      const extra = { addOrdine: d => withLock_(() => addOrdine_(d)), updateOrdine: d => withLock_(() => updateOrdine_(d)) };
-      if (!extra[p.action]) return orig(p);
-      try {
-        if (!p.token || p.token !== PROPS.getProperty('API_TOKEN')) return json_({ ok: false, error: 'Token non valido' });
-        const d = p.data && typeof p.data === 'object' ? p.data : p;
-        return json_({ ok: true, data: extra[p.action](d) });
-      } catch (err) { return json_({ ok: false, error: String(err && err.message || err) }); }
-    };
-    ['_v2', '_v3', '_esp', '_imp'].forEach(k => { if (orig[k]) handle_[k] = true; });
-    handle_._ord = true;
-  }
-})();
+aggancia_({
+  addOrdine: d => withLock_(() => addOrdine_(d)),
+  updateOrdine: d => withLock_(() => updateOrdine_(d)),
+});
 
 function schemaOrdini_() {
   schema_();

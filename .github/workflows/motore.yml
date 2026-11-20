@@ -1,0 +1,35 @@
+# Pubblica il motore Apps Script a ogni modifica dei file in motore/
+# (oppure a mano: scheda Actions → "Deploy motore" → Run workflow, con la prova a secco se vuoi)
+name: Deploy motore
+on:
+  push:
+    branches: [main]
+    paths: ['motore/**', 'tools/deploy-motore.mjs']
+  workflow_dispatch:
+    inputs:
+      prova:
+        description: 'Solo prova (non scrive nulla)'
+        type: boolean
+        default: false
+concurrency: { group: motore, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Controllo sintassi dei file .gs
+        run: for f in motore/*.gs; do cp "$f" /tmp/x.js && node --check /tmp/x.js || { echo "Errore di sintassi in $f"; exit 1; }; done
+      - name: Pubblica su Apps Script
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          SCRIPT_ID: ${{ secrets.SCRIPT_ID }}
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+          DRY_RUN: ${{ inputs.prova && '1' || '' }}
+          DESCRIZIONE: ${{ github.event.head_commit.message || 'Deploy manuale' }}
+        run: node tools/deploy-motore.mjs
+      - name: Copia di sicurezza del progetto prima del deploy
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: backup-motore, path: backup/, retention-days: 30, if-no-files-found: ignore }

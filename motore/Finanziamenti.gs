@@ -2,7 +2,7 @@
  * FINANZE APP — FINANZIAMENTI (file separato, va in fondo all'elenco, SOTTO "Impostazioni")
  * Legge la scheda "Finanziamenti" del database (una riga per finanziamento) e calcola
  * rate pagate, rate mancanti, debito residuo, prossima rata e data di fine.
- * Azione: "finanziamenti". Non serve eseguire nulla: basta fare "Nuova versione" del deployment.
+ * Azione: "finanziamenti". Si pubblica da solo con il deploy automatico (vedi DEPLOY.md).
  *
  * Colonne usate: Nome, Tipo, Importo finanziato, Durata (mesi), Rata, Spese incasso,
  * Giorno addebito, Data attivazione, Data scadenza, TAN, Attivo, Note.
@@ -10,20 +10,7 @@
  */
 const FIN = 'Finanziamenti';
 
-(function () {
-  if (typeof handle_ === 'function' && !handle_._fin) {
-    const orig = handle_;
-    handle_ = function (p) {
-      if (p.action !== 'finanziamenti') return orig(p);
-      try {
-        if (!p.token || p.token !== PROPS.getProperty('API_TOKEN')) return json_({ ok: false, error: 'Token non valido' });
-        return json_({ ok: true, data: finanziamenti_() });
-      } catch (err) { return json_({ ok: false, error: String(err && err.message || err) }); }
-    };
-    ['_v2', '_v3', '_esp', '_imp'].forEach(k => { if (orig[k]) handle_[k] = true; });
-    handle_._fin = true;
-  }
-})();
+aggancia_({ finanziamenti: () => finanziamenti_() });
 
 function finanziamenti_() {
   const sh = ss_().getSheetByName(FIN);

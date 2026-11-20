@@ -1,0 +1,11 @@
+# Ordine dei file del motore in Apps Script (serve solo per i file NUOVI:
+# quelli già nel progetto mantengono la loro posizione).
+# Ogni file nuovo viene messo subito dopo quello che lo precede in questa lista.
+Codice
+Aggancio
+Prezzi
+Storico
+Esposizione
+Impostazioni
+Ordini
+Finanziamenti

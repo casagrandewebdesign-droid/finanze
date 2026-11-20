@@ -1,0 +1,28 @@
+# Pubblica l'app su GitHub Pages a ogni push, mettendo da solo il numero di versione
+# (index.html e sw.js): non serve più aggiornare a mano VERSIONE e il nome della cache.
+# Richiede una volta: Settings → Pages → Source: "GitHub Actions".
+name: Deploy app
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['motore/**', 'tools/**', '*.md']
+  workflow_dispatch:
+permissions: { contents: read, pages: write, id-token: write }
+concurrency: { group: pages, cancel-in-progress: true }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: { name: github-pages, url: '${{ steps.d.outputs.page_url }}' }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepara il sito con il numero di versione
+        run: |
+          mkdir _site
+          cp index.html sw.js manifest.json world.json icon-*.png _site/
+          BUILD="$(git rev-parse --short HEAD) · $(TZ=Europe/Rome date +'%d/%m %H:%M')"
+          sed -i "s|__BUILD__|$BUILD|g" _site/index.html
+          sed -i "s|__BUILD__|$(git rev-parse --short HEAD)|g" _site/sw.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+      - id: d
+        uses: actions/deploy-pages@v4

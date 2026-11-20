@@ -24,28 +24,15 @@ const ACQ_HEAD = ['ID', 'Data', 'Investimento', 'Importo', 'Prezzo', 'Quote', 'N
 const COL_COD = 'Codice (ISIN/ticker)';
 
 // ============ aggancio a Codice.gs ============
+aggancia_({
+  aggiornaPrezzi: d => withLock_(() => aggiornaPrezzi_(d.nome)),
+  addAcquisto: d => withLock_(() => addAcquisto_(d)),
+  deleteAcquisto: d => withLock_(() => deleteAcquisto_(d.id)),
+  addInvestimento: d => withLock_(() => addInvestimento_(d)),
+  deleteInvestimento: d => withLock_(() => deleteInvestimento_(d.nome)),
+});
+
 (function () {
-  if (typeof handle_ === 'function' && !handle_._v2) {
-    const orig = handle_;
-    handle_ = function (p) {
-      const extra = {
-        aggiornaPrezzi: d => withLock_(() => aggiornaPrezzi_(d.nome)),
-        addAcquisto: d => withLock_(() => addAcquisto_(d)),
-        deleteAcquisto: d => withLock_(() => deleteAcquisto_(d.id)),
-        addInvestimento: d => withLock_(() => addInvestimento_(d)),
-        deleteInvestimento: d => withLock_(() => deleteInvestimento_(d.nome)),
-      };
-      if (!extra[p.action]) return orig(p);
-      try {
-        if (!p.token || p.token !== PROPS.getProperty('API_TOKEN')) return json_({ ok: false, error: 'Token non valido' });
-        const d = p.data && typeof p.data === 'object' ? p.data : p;
-        return json_({ ok: true, data: extra[p.action](d) });
-      } catch (err) {
-        return json_({ ok: false, error: String(err && err.message || err) });
-      }
-    };
-    handle_._v2 = true;
-  }
   if (typeof getDashboard_ === 'function' && !getDashboard_._v2) {
     const orig = getDashboard_;
     getDashboard_ = function (m) { const r = orig(m); if (!r._v2) arricchisci_(r); return r; };

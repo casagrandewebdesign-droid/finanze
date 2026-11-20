@@ -7,19 +7,9 @@
 const STO = 'Storico investimenti';
 const STO_HEAD = ['Data', 'Investimento', 'Prezzo', 'Quote', 'Valore'];
 
+aggancia_({ storicoInvestimento: d => storicoInvestimento_(d.nome, d.periodo) });
+
 (function () {
-  if (typeof handle_ === 'function' && !handle_._v3) {
-    const orig = handle_;
-    handle_ = function (p) {
-      if (p.action !== 'storicoInvestimento') return orig(p);
-      try {
-        if (!p.token || p.token !== PROPS.getProperty('API_TOKEN')) return json_({ ok: false, error: 'Token non valido' });
-        const d = p.data && typeof p.data === 'object' ? p.data : p;
-        return json_({ ok: true, data: storicoInvestimento_(d.nome, d.periodo) });
-      } catch (err) { return json_({ ok: false, error: String(err && err.message || err) }); }
-    };
-    handle_._v2 = true; handle_._v3 = true;
-  }
   if (typeof aggiornaPrezzi_ === 'function' && !aggiornaPrezzi_._v3) {
     const orig = aggiornaPrezzi_;
     aggiornaPrezzi_ = function (nome) { const r = orig(nome); try { fotografa_(nome); } catch (e) { console.warn(e); } return r; };

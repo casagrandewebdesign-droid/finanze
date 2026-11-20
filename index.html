@@ -1569,8 +1569,8 @@ function demoApi(action, params, body){
 }
 
 /* ================== Avvio ================== */
-const VERSIONE='25 · 20/11 14:45';
-try{ document.getElementById('verInfo').textContent='Versione app '+VERSIONE; }catch(e){}
+const VERSIONE='__BUILD__';   // lo scrive il deploy automatico (commit · data)
+try{ document.getElementById('verInfo').textContent='Versione app '+(VERSIONE.startsWith('__')?'di sviluppo':VERSIONE); }catch(e){}
 if('serviceWorker' in navigator && location.protocol==='https:'){
   navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(r=>r.update()).catch(()=>{});
   // quando arriva una versione nuova dell'app, ricarica una volta da solo

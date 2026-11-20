@@ -13,21 +13,7 @@
 const ESP_COLS = ['Paesi auto', 'Settori auto', 'Esposizione fonte'];
 
 // ============ aggancio: azione "aggiornaEsposizione" per l'app ============
-(function () {
-  if (typeof handle_ === 'function' && !handle_._esp) {
-    const orig = handle_;
-    handle_ = function (p) {
-      if (p.action !== 'aggiornaEsposizione') return orig(p);
-      try {
-        if (!p.token || p.token !== PROPS.getProperty('API_TOKEN')) return json_({ ok: false, error: 'Token non valido' });
-        const d = p.data && typeof p.data === 'object' ? p.data : p;
-        return json_({ ok: true, data: withLock_(() => aggiornaEsposizione_(d.nome, true)) });
-      } catch (err) { return json_({ ok: false, error: String(err && err.message || err) }); }
-    };
-    ['_v2', '_v3'].forEach(k => { if (orig[k]) handle_[k] = true; });
-    handle_._esp = true;
-  }
-})();
+aggancia_({ aggiornaEsposizione: d => withLock_(() => aggiornaEsposizione_(d.nome, true)) });
 
 // ============ nomi in italiano ============
 const ESP_NOMI = {
