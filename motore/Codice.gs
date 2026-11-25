@@ -561,89 +561,11 @@ function fromSms_(testo) {
   });
 }
 
-// ============ 5b. INTEGRAZIONE PAYPAL (email in Gmail) ============
-/**
- * Legge una volta al giorno le ricevute PayPal arrivate in Gmail e le aggiunge ad Asset.
- * - "Hai inviato X € a Nome"      -> uscita
- * - "Hai pagato X € a Negozio"     -> uscita
- * - "Nome ti ha inviato X €"       -> entrata
- * - "Hai ricevuto un rimborso da…" -> entrata
- * Niente doppioni: il codice transazione PayPal finisce nella colonna Fonte e viene controllato.
- * Vengono lette solo le email arrivate DOPO l'attivazione (le precedenti le hai già registrate).
- */
-function attivaPaypal() {
-  if (!PROPS.getProperty('PAYPAL_DA')) PROPS.setProperty('PAYPAL_DA', String(Math.floor(Date.now() / 1000)));
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'importaPaypal').forEach(t => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('importaPaypal').timeBased().everyDays(1).atHour(21).inTimezone(TZ).create();
-  console.log('Import PayPal attivo: ogni giorno verso le 21. Email considerate da: ' + new Date(Number(PROPS.getProperty('PAYPAL_DA')) * 1000));
-}
-
-function disattivaPaypal() {
-  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'importaPaypal').forEach(t => ScriptApp.deleteTrigger(t));
-  console.log('Import PayPal disattivato');
-}
-
-function testoEmail_(html) {
-  return String(html).replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
-}
-
-/** Interpreta una ricevuta PayPal. Restituisce null se l'email non è un movimento. */
-function leggiPaypal_(oggetto, testo) {
-  const EUR = '([0-9.]+,[0-9]{2}) ?€';
-  let m, imp, chi, segno;
-  if (/Hai ricevuto del denaro/i.test(oggetto) && /rimborso/i.test(testo)) return null; // conferma di un rimborso già notificato
-  if ((m = testo.match(new RegExp('Hai inviato ' + EUR + '(?: EUR)? a (.+?) (?:Dettagli|Codice|Data)')))) { imp = m[1]; chi = m[2]; segno = 'uscita'; }
-  else if ((m = testo.match(new RegExp('Hai pagato ' + EUR + '(?: EUR)? a (.+?) (?:Commerciante|Dettagli|Codice|Data)')))) { imp = m[1]; chi = m[2]; segno = 'uscita'; }
-  else if ((m = testo.match(new RegExp('ti ha inviato un rimborso di ' + EUR)))) {
-    imp = m[1]; segno = 'entrata';
-    chi = 'Rimborso ' + ((oggetto.match(/rimborso da (.+)$/i) || [])[1] || '').trim();
-  }
-  else if ((m = testo.match(new RegExp('Ciao [^ ]+ [^ ]+ (.+?) ti ha inviato ' + EUR)))) { chi = m[1]; imp = m[2]; segno = 'entrata'; }
-  else return null;
-  const codice = (testo.match(/Codice transazione:? ([A-Z0-9]{12,20})/) || [])[1] || '';
-  return { importo: num_(imp), descrizione: chi.replace(/\.\.\.$/, '').trim(), segno, codice };
-}
-
-// Spento: le uscite arrivano dagli addebiti diretti della banca (Banca.gs), così non si contano due volte.
-// Al primo giro si toglie da solo il trigger giornaliero. Per riaccenderlo: metti false ed esegui attivaPaypal.
-const PAYPAL_SPENTO = true;
-
+// ============ 5b. PAYPAL: rimosso ============
+// Le spese pagate con PayPal arrivano ora dagli addebiti diretti della banca (Banca.gs).
+// Resta solo questo: alla prossima esecuzione (stasera alle 21) toglie il vecchio trigger giornaliero.
 function importaPaypal() {
-  if (PAYPAL_SPENTO) { disattivaPaypal(); return 0; }
-  const da = Number(PROPS.getProperty('PAYPAL_DA') || 0);
-  if (!da) throw new Error('Esegui prima attivaPaypal');
-  const fatti = JSON.parse(PROPS.getProperty('PAYPAL_FATTI') || '[]');
-  const fonti = assetSheet_().getRange('F:F').getValues().map(r => String(r[0]));
-  let aggiunti = 0;
-  GmailApp.search('from:(paypal.it OR paypal.com) after:' + da, 0, 50).reverse().forEach(th => {
-    th.getMessages().forEach(msg => {
-      const id = msg.getId();
-      if (fatti.indexOf(id) > -1 || msg.getDate().getTime() / 1000 < da) return;
-      fatti.push(id);
-      const p = leggiPaypal_(msg.getSubject(), testoEmail_(msg.getBody()));
-      if (!p || !p.importo) return;
-      if (p.codice && fonti.some(f => f.indexOf(p.codice) > -1)) return; // già presente
-      const categoria = categorizza_(p.descrizione);
-      withLock_(() => addMovimento_({
-        data: msg.getDate(), importo: p.importo, segno: p.segno, categoria,
-        descrizione: p.descrizione,
-        fonte: 'PayPal' + (p.codice ? ' · ' + p.codice : '') + (categoria ? '' : ' · DA VERIFICARE'),
-      }));
-      aggiunti++;
-    });
-  });
-  PROPS.setProperty('PAYPAL_FATTI', JSON.stringify(fatti.slice(-300)));
-  console.log('PayPal: ' + aggiunti + ' movimenti aggiunti');
-  return aggiunti;
-}
-
-/** Prova la lettura sulle ultime ricevute PayPal senza scrivere niente. */
-function testPaypal() {
-  GmailApp.search('from:(paypal.it OR paypal.com) newer_than:90d', 0, 15).forEach(th => {
-    const msg = th.getMessages()[0];
-    console.log(msg.getSubject() + ' → ' + JSON.stringify(leggiPaypal_(msg.getSubject(), testoEmail_(msg.getBody()))));
-  });
+  ScriptApp.getProjectTriggers().filter(t => t.getHandlerFunction() === 'importaPaypal').forEach(t => ScriptApp.deleteTrigger(t));
 }
 
 // ============ 6. INTEGRAZIONE FOGLIO "ASSET" (opzionale) ============
