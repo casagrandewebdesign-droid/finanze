@@ -10,3 +10,4 @@ Impostazioni
 Ordini
 Finanziamenti
 Isin
+Banca

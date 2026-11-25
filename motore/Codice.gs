@@ -605,7 +605,12 @@ function leggiPaypal_(oggetto, testo) {
   return { importo: num_(imp), descrizione: chi.replace(/\.\.\.$/, '').trim(), segno, codice };
 }
 
+// Spento: le uscite arrivano dagli addebiti diretti della banca (Banca.gs), così non si contano due volte.
+// Al primo giro si toglie da solo il trigger giornaliero. Per riaccenderlo: metti false ed esegui attivaPaypal.
+const PAYPAL_SPENTO = true;
+
 function importaPaypal() {
+  if (PAYPAL_SPENTO) { disattivaPaypal(); return 0; }
   const da = Number(PROPS.getProperty('PAYPAL_DA') || 0);
   if (!da) throw new Error('Esegui prima attivaPaypal');
   const fatti = JSON.parse(PROPS.getProperty('PAYPAL_FATTI') || '[]');
