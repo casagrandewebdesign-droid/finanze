@@ -580,21 +580,25 @@ async function load(){
   try{
     await flushQueue();
     const mese=ym(new Date());
-    const r = await api('init',{mese});
-    const config=r.config, dash=r.dashboard;
-    LS.set('mov_'+(DEMO()?'demo_':'')+mese, r.movimenti);
-    S.config=config; S.dash=dash; LS.set('dash_'+(DEMO()?'demo':'live'),dash); LS.set('config',config);
-    renderHome(); renderInv(); renderConti(); renderPaesi(); fillForm();
-    if($('v-mov').classList.contains('on')) renderMov();
-    if($('v-cfr').classList.contains('on')) drawCfr();
-    // in background: prepara lo storico così la scheda Patrimonio si apre subito
+    applyInit(await api('init',{mese}), mese);
     syncImpostazioni();
-    api('storico').then(st=>{ P.dati=st; LS.set('storico_'+(DEMO()?'demo':'live'),st); if($('v-pat').classList.contains('on')) drawPat(); }).catch(()=>{});
-    $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
   }catch(e){
     S.config = S.config || LS.get('config'); fillForm();
     $('syncInfo').textContent = 'Offline o motore non raggiungibile: '+e.message;
   }
+}
+
+/* applica i dati di "init" (arrivano da load() o direttamente dalla risposta di addMovimento) */
+function applyInit(r, mese){
+  const config=r.config, dash=r.dashboard;
+  LS.set('mov_'+(DEMO()?'demo_':'')+mese, r.movimenti);
+  S.config=config; S.dash=dash; LS.set('dash_'+(DEMO()?'demo':'live'),dash); LS.set('config',config);
+  renderHome(); renderInv(); renderConti(); renderPaesi(); fillForm();
+  if($('v-mov').classList.contains('on')) renderMov();
+  if($('v-cfr').classList.contains('on')) drawCfr();
+  // in background: prepara lo storico così la scheda Patrimonio si apre subito
+  api('storico').then(st=>{ P.dati=st; LS.set('storico_'+(DEMO()?'demo':'live'),st); if($('v-pat').classList.contains('on')) drawPat(); }).catch(()=>{});
+  $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
 }
 
 /* ================== Render ================== */
@@ -1323,10 +1327,28 @@ $('aSave').onclick=async()=>{
   const imp=parseNum($('aImp').value); if(!imp){ toast('Inserisci un importo'); return; }
   const mov={ data:$('aData').value||today(), importo:imp, segno:S.segno==='entrata'?'entrata':'uscita', tipo:S.segno==='mov'?'mov':undefined, categoria:S.cat, conto:$('aConto').value, descrizione:$('aDesc').value.trim(), fonte:'App' };
   closeSheets(); toast('Salvato ✓');
-  try{ await api('addMovimento',{},mov); }
+  mostraSubito(mov);
+  const mese=ym(new Date());
+  try{ const r=await api('addMovimento',{},{...mov,_mese:mese});
+    if(r && r.init){ applyInit(r.init, mese); return; } }  // motore aggiornato: una sola chiamata
   catch(e){ S.queue.push(mov); LS.set('queue',S.queue); toast('Offline: lo invio appena torna la rete'); }
-  load(); if($('v-mov').classList.contains('on')) renderMov();
+  load();
 };
+/* mostra il movimento nell'elenco e nei totali prima che il motore risponda */
+function mostraSubito(mov){
+  const imp=mov.segno==='entrata'?Math.abs(mov.importo):-Math.abs(mov.importo);
+  const tipo=mov.tipo||(mov.segno==='entrata'?'entrate':'uscite');
+  const m={id:'',data:mov.data,importo:imp,tipo,categoria:mov.categoria,conto:mov.conto,descrizione:mov.descrizione,fonte:'App · invio in corso'};
+  const mese=mov.data.slice(0,7), k=movKey(mese), list=LS.get(k);
+  if(list){ list.unshift(m); list.sort((a,b)=>a.data<b.data?1:a.data>b.data?-1:0); LS.set(k,list); }
+  const d=S.dash;
+  if(d && mese===ym(new Date())){
+    if(tipo==='entrate') d.entrate=(d.entrate||0)+imp; else if(tipo==='uscite') d.uscite=(d.uscite||0)-imp;
+    d.ultimi=[m].concat(d.ultimi||[]).sort((a,b)=>a.data<b.data?1:a.data>b.data?-1:0).slice(0,8);
+    renderHome();
+  }
+  if($('v-mov').classList.contains('on') && S.mese===mese && list) $('movList').innerHTML=movRows(list);
+}
 
 /* dettaglio / elimina */
 let detMov=null;

@@ -46,9 +46,14 @@ function cachePut_(k, obj) {
   const n = Math.ceil(s.length / size);
   for (let i = 0; i < n; i++) put[k + '_' + i] = s.substr(i * size, size);
   put[k + '_n'] = String(n);
-  try { CacheService.getScriptCache().putAll(put, CACHE_MIN * 60); } catch (e) { console.warn('cache: ' + e); }
+  try { CacheService.getScriptCache().putAll(put, CACHE_MIN * 60); return true; } catch (e) { console.warn('cache: ' + e); return false; }
 }
-function cacheClear_() { CacheService.getScriptCache().removeAll(['asset_n', 'storico_n']); }
+// Svuota la cache di Asset dopo una scrittura, a meno che la scrittura l'abbia già aggiornata (_mem.cacheAggiornata).
+// Lo Storico NW non dipende dai movimenti (i flussi si ricalcolano a ogni richiesta), quindi la sua cache resta.
+function cacheClear_() {
+  if (_mem.cacheAggiornata) return;
+  CacheService.getScriptCache().removeAll(['asset_n', 'storico_n']);
+}
 // Foglio "Asset": i suoi movimenti storici vengono letti (solo lettura) e uniti a quelli dell'app
 const ASSET_ID = PROPS.getProperty('ASSET_ID') || '1oVrRX1yv78Cy2STKXqFLCX43nLTlCv-O4iXJcs6hC2g';
 function sh_(name) { return ss_().getSheetByName(name); }
@@ -125,7 +130,7 @@ function handle_(p) {
       movimenti: () => getMovimenti_(p.mese),
       storico: () => getStorico_(),
       init: () => ({ config: getConfig_(), dashboard: getDashboard_(p.mese), movimenti: getMovimenti_(p.mese) }),
-      addMovimento: () => withLock_(() => addMovimento_(d)),
+      addMovimento: () => conInit_(withLock_(() => addMovimento_(d)), d._mese),
       deleteMovimento: () => withLock_(() => deleteMovimento_(d.id || p.id, d.fp)),
       updateMovimento: () => withLock_(() => updateMovimento_(d)),
       confermaMovimento: () => withLock_(() => updateMovimento_(Object.assign({}, d, { conferma: true }))),
@@ -144,6 +149,13 @@ function withLock_(fn) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try { return fn(); } finally { lock.releaseLock(); cacheClear_(); Object.keys(_mem).forEach(k => { if (k !== 'ss' && k !== 'assetSs') delete _mem[k]; }); }
+}
+
+/** Dopo addMovimento: se l'app passa _mese, risponde già con i dati aggiornati (una chiamata invece di due) */
+function conInit_(mov, mese) {
+  if (!mese) return mov;
+  mov.init = { config: getConfig_(), dashboard: getDashboard_(mese), movimenti: getMovimenti_(mese) };
+  return mov;
 }
 
 // ============ 3. LETTURE ============
@@ -194,6 +206,21 @@ function assetMovs_() {
     console.warn('Lettura Asset non riuscita: ' + err);
     return [];
   }
+}
+
+/**
+ * La nuova riga è stata inserita in riga 2 di Asset: aggiorna la cache invece di svuotarla.
+ * Le righe esistenti scendono di una (id A3 → A4…). Se la cache non c'è o non si salva, viene svuotata come prima.
+ */
+function aggiungiACacheAsset_(r) {
+  const list = _mem.asset || cacheGet_('asset');
+  if (!list) return;
+  const nuova = {
+    id: 'A2', fp: fp_(r), data: ymd_(r[4]), importo: num_(r[2]), tipo: '', categoria: r[1], conto: 'Fideuram',
+    descrizione: r[3] || '', fonte: String(r[5] || 'Asset'), creato: 1e9, senzaData: false,
+  };
+  const out = [nuova].concat(list.map(m => Object.assign({}, m, { id: 'A' + (Number(String(m.id).slice(1)) + 1), creato: m.creato - 1 })));
+  if (cachePut_('asset', out)) { _mem.asset = out; _mem.cacheAggiornata = true; }
 }
 
 // ---- Scrittura sulla tab Movimenti di Asset (archivio unico dei movimenti) ----
@@ -438,7 +465,9 @@ function addMovimento_(d) {
     const sh = assetSheet_();
     sh.insertRowAfter(1);                  // i più recenti in alto, come nel tuo foglio
     copiaFormato_(sh);
-    sh.getRange(2, 1, 1, 6).setValues([[codAsset_(dt), cat, round2_(imp), d.descrizione || '', dt, d.fonte || 'App']]);
+    const riga = [codAsset_(dt), cat, round2_(imp), d.descrizione || '', dt, d.fonte || 'App'];
+    sh.getRange(2, 1, 1, 6).setValues([riga]);
+    aggiungiACacheAsset_(riga);            // evita di rileggere tutto Asset alla prossima richiesta
     return { id: 'A2', data: ymd_(dt), importo: round2_(imp), categoria: cat, descrizione: d.descrizione || '' };
   }
 
