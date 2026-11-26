@@ -11,3 +11,4 @@ Ordini
 Finanziamenti
 Isin
 Banca
+Sync

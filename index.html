@@ -556,27 +556,71 @@ async function api(action, params={}, body=null){
     u.searchParams.set('action',action); u.searchParams.set('token',S.cfg.token);
     Object.entries(params).forEach(([k,v])=>u.searchParams.set(k,v));
     const r = await fetch(u); const j = await r.json();
-    if(!j.ok) throw new Error(j.error); return j.data;
+    if(!j.ok) throw erroreMotore(j.error); return j.data;
   }
   // POST "semplice" (text/plain) → niente preflight CORS con Apps Script
   const r = await fetch(u,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action,token:S.cfg.token,data:body})});
-  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+  const j = await r.json(); if(!j.ok) throw erroreMotore(j.error); return j.data;
 }
+/* errore "vero" del motore (dati non validi ecc.): riprovare non serve.
+   Rete assente, token o blocco occupato invece sono temporanei. */
+function erroreMotore(msg){ const e=new Error(msg); e.server=!/token|lock|blocco|timeout|tempo/i.test(msg||''); return e; }
 
-/* coda offline: se manca la rete il movimento resta in attesa e parte dopo */
-async function flushQueue(){
-  if (DEMO() || !S.queue.length) return;
-  const rest=[];
-  for (const m of S.queue){ try{ await api('addMovimento',{},m) }catch(e){ rest.push(m) } }
-  S.queue=rest; LS.set('queue',rest);
+/* ===== coda offline: ogni scrittura (aggiunta, modifica, conferma, eliminazione)
+   resta qui finché il motore non la riceve; parte in ordine appena torna la rete ===== */
+S.queue = S.queue.map(q => q && q.action ? q : {action:'addMovimento', data:q});   // vecchio formato: solo movimenti
+const nuovoCid = () => Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+function accoda(action, data){ S.queue.push({action,data,t:Date.now()}); LS.set('queue',S.queue); infoSync(); }
+let _flush=null;
+function flushQueue(){
+  if (DEMO() || !S.queue.length) return Promise.resolve();
+  if (_flush) return _flush;                 // un solo invio alla volta: niente doppioni
+  _flush=(async()=>{
+    while (S.queue.length){
+      const q=S.queue[0];
+      try{ await api(q.action,{},q.data); }
+      catch(e){
+        if(!e.server) break;                   // rete o motore non raggiungibile: riprovo dopo
+        q.tent=(q.tent||0)+1;
+        if(q.tent<3){ LS.set('queue',S.queue); break; }
+        toast('Non inviato: '+e.message);      // rifiutato 3 volte dal motore: lo scarto
+      }
+      S.queue.shift(); LS.set('queue',S.queue);
+    }
+    infoSync();
+  })().finally(()=>{ _flush=null; });
+  return _flush;
 }
+/* scrittura dall'app: parte subito se si può, altrimenti va in coda */
+async function scrivi(action, data, msg){
+  toast(msg);
+  if (S.queue.length){ accoda(action,data); await flushQueue(); }
+  else try{ await api(action,{},data); }
+  catch(e){
+    if(e.server){ toast('Errore: '+e.message); }
+    else { accoda(action,data); toast('Offline: lo invio appena torna la rete'); return; }
+  }
+  await load(); if($('v-mov').classList.contains('on')) renderMov();
+}
+function infoSync(testo){
+  if(testo) infoSync._t=testo;
+  const n=S.queue.length;
+  $('syncInfo').textContent=(infoSync._t||'')+(n?` · ${n} in attesa di invio`:'');
+}
+window.addEventListener('online',()=>load());
 
 /* ================== Caricamento ================== */
 async function load(){
   $('demoBanner').hidden = !DEMO();
   // mostra subito l'ultima versione salvata
-  const cached = LS.get('dash_'+(DEMO()?'demo':'live'));
-  if (cached){ S.dash=cached; renderHome(); }
+  // mostra subito l'ultima versione salvata su tutte le schede, poi aggiorna dal motore
+  if (!load._fatto){ load._fatto=true;
+    const cached = LS.get('dash_'+(DEMO()?'demo':'live'));
+    S.config = S.config || LS.get('config');
+    if (cached){ S.dash=cached; try{ renderHome(); renderInv(); renderConti(); renderPaesi(); }catch(e){} }
+    if (S.config) fillForm();
+    if (cached) infoSync('Copia salvata, aggiorno…');
+  }
   try{
     await flushQueue();
     const mese=ym(new Date());
@@ -584,7 +628,7 @@ async function load(){
     syncImpostazioni();
   }catch(e){
     S.config = S.config || LS.get('config'); fillForm();
-    $('syncInfo').textContent = 'Offline o motore non raggiungibile: '+e.message;
+    infoSync(navigator.onLine===false || e instanceof TypeError ? 'Senza rete: vedi l’ultima copia salvata' : 'Motore non raggiungibile: '+e.message);
   }
 }
 
@@ -598,7 +642,7 @@ function applyInit(r, mese){
   if($('v-cfr').classList.contains('on')) drawCfr();
   // in background: prepara lo storico così la scheda Patrimonio si apre subito
   api('storico').then(st=>{ P.dati=st; LS.set('storico_'+(DEMO()?'demo':'live'),st); if($('v-pat').classList.contains('on')) drawPat(); }).catch(()=>{});
-  $('syncInfo').textContent = 'Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}) + (S.queue.length?` · ${S.queue.length} in attesa di invio`:'');
+  infoSync('Aggiornato alle '+new Date().toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'}));
 }
 
 /* ================== Render ================== */
@@ -1325,13 +1369,16 @@ $('segTipo').onclick=e=>{ const b=e.target.closest('button'); if(!b) return; S.s
 $('aCats').onclick=e=>{ const b=e.target.closest('.chip'); if(!b) return; S.cat=b.dataset.cat; fillForm(); };
 $('aSave').onclick=async()=>{
   const imp=parseNum($('aImp').value); if(!imp){ toast('Inserisci un importo'); return; }
-  const mov={ data:$('aData').value||today(), importo:imp, segno:S.segno==='entrata'?'entrata':'uscita', tipo:S.segno==='mov'?'mov':undefined, categoria:S.cat, conto:$('aConto').value, descrizione:$('aDesc').value.trim(), fonte:'App' };
+  const mov={ data:$('aData').value||today(), importo:imp, segno:S.segno==='entrata'?'entrata':'uscita', tipo:S.segno==='mov'?'mov':undefined, categoria:S.cat, conto:$('aConto').value, descrizione:$('aDesc').value.trim(), fonte:'App', cid:nuovoCid() };
   closeSheets(); toast('Salvato ✓');
   mostraSubito(mov);
   const mese=ym(new Date());
+  if(S.queue.length){ accoda('addMovimento',mov); await flushQueue(); load(); return; }   // prima partono quelli in attesa
   try{ const r=await api('addMovimento',{},{...mov,_mese:mese});
     if(r && r.init){ applyInit(r.init, mese); return; } }  // motore aggiornato: una sola chiamata
-  catch(e){ S.queue.push(mov); LS.set('queue',S.queue); toast('Offline: lo invio appena torna la rete'); }
+  catch(e){
+    if(e.server) toast('Errore: '+e.message);
+    else { accoda('addMovimento',mov); toast('Offline: lo invio appena torna la rete'); return; } }
   load();
 };
 /* mostra il movimento nell'elenco e nei totali prima che il motore risponda */
@@ -1373,13 +1420,33 @@ document.addEventListener('click',e=>{
 });
 function editBody(){ const b={id:detMov.id,fp:detMov.fp,categoria:$('eCat').value,descrizione:$('eDesc').value.trim(),importo:parseNum($('eImp').value)};
   if($('eData').value) b.data=$('eData').value; return b; }
-async function afterWrite(msg){ toast(msg); await load(); if($('v-mov').classList.contains('on')) renderMov(); }
-$('detSave').onclick=async()=>{ if(!detMov) return; const b=editBody(); closeSheets();
-  try{ await api('updateMovimento',{},b); afterWrite('Modificato ✓'); }catch(e){ toast('Errore: '+e.message); } };
-$('detConf').onclick=async()=>{ if(!detMov) return; const b=editBody(); closeSheets();
-  try{ await api('confermaMovimento',{},b); afterWrite('Confermato ✓'); }catch(e){ toast('Errore: '+e.message); } };
-$('detDel').onclick=async()=>{ if(!detMov) return; if(!confirm('Eliminare questo movimento anche dal foglio?')) return; closeSheets();
-  try{ await api('deleteMovimento',{},{id:detMov.id,fp:detMov.fp}); afterWrite('Eliminato'); }catch(e){ toast('Errore: '+e.message); } };
+/* applica subito sul telefono una modifica/conferma/eliminazione, prima che il motore risponda */
+function ritocca(vecchio, b, tipo){
+  const stesso = m => m.id===vecchio.id && (m.fp||'')===(vecchio.fp||'');
+  const nuovo = m => { if(tipo==='del') return null;
+    const s=Math.sign(m.importo)||-1, n={...m, categoria:b.categoria, descrizione:b.descrizione, importo:s*Math.abs(b.importo||0)};
+    if(b.data){ n.data=b.data; n.senzaData=false; }
+    if(tipo==='conf') n.fonte=String(m.fonte||'').replace(/\s*·?\s*DA VERIFICARE/i,'').trim();
+    return n; };
+  const fix = list => { const out=[]; (list||[]).forEach(m=>{ const n=stesso(m)?nuovo(m):m; if(n) out.push(n); }); return out; };
+  new Set([vecchio.data&&vecchio.data.slice(0,7), S.mese]).forEach(mm=>{ if(!mm) return; const k=movKey(mm), l=LS.get(k); if(l) LS.set(k,fix(l)); });
+  const d=S.dash;
+  if(d){
+    if(vecchio.data && vecchio.data.slice(0,7)===ym(new Date())){
+      const diff=(nuovo(vecchio)||{importo:0}).importo - vecchio.importo;
+      if(vecchio.tipo==='entrate') d.entrate=(d.entrate||0)+diff; else if(vecchio.tipo==='uscite') d.uscite=(d.uscite||0)-diff;
+    }
+    d.ultimi=fix(d.ultimi); LS.set('dash_'+(DEMO()?'demo':'live'),d); renderHome();
+  }
+  if($('v-mov').classList.contains('on')){ const l=LS.get(movKey(S.mese)); if(l) $('movList').innerHTML=movRows(l)||'<div class="empty">Nessun movimento</div>'; }
+}
+function inInvio(){ if(detMov && !detMov.id){ toast('Ancora in invio: riprova tra poco'); return true; } return false; }
+$('detSave').onclick=()=>{ if(!detMov||inInvio()) return; const b=editBody(); closeSheets();
+  ritocca(detMov,b,'mod'); scrivi('updateMovimento',b,'Modificato ✓'); };
+$('detConf').onclick=()=>{ if(!detMov||inInvio()) return; const b=editBody(); closeSheets();
+  ritocca(detMov,b,'conf'); scrivi('confermaMovimento',b,'Confermato ✓'); };
+$('detDel').onclick=()=>{ if(!detMov||inInvio()) return; if(!confirm('Eliminare questo movimento anche dal foglio?')) return; closeSheets();
+  const b={id:detMov.id,fp:detMov.fp}; ritocca(detMov,b,'del'); scrivi('deleteMovimento',b,'Eliminato'); };
 $('invSave').onclick=async()=>{
   const i=invCur, v2=!!(S.dash&&S.dash._v2), body={nome:i.nome}, num=x=>parseNum($(x).value);
   const fx=n=>n?String(n).replace('.',','):'';
